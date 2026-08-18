@@ -8,6 +8,7 @@ import threading
 import os
 import urllib.request
 import json
+import platform
 from pathlib import Path
 from tkinter import filedialog
 from config import ConfigManager
@@ -15,7 +16,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.3"
+APP_VERSION = "v1.0.4"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -94,6 +95,28 @@ class ZarManagerGUI(ctk.CTk):
         self.geometry("1050x700")
         self.minsize(900, 600)
         
+        # ------------------------------------------
+        # INJEÇÃO DO ÍCONE DA JANELA (CROSS-PLATFORM)
+        # ------------------------------------------
+        try:
+            if getattr(sys, 'frozen', False):
+                base_path = Path(sys._MEIPASS)
+            else:
+                base_path = Path(__file__).parent.resolve()
+            
+            if platform.system() == "Windows":
+                icon_path = base_path / "img" / "icon.ico"
+                if icon_path.exists():
+                    self.iconbitmap(str(icon_path))
+            else:
+                icon_path = base_path / "img" / "logo.png"
+                if icon_path.exists():
+                    img = tk.PhotoImage(file=str(icon_path))
+                    self.iconphoto(False, img)
+        except Exception:
+            pass
+        # ------------------------------------------
+
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         
@@ -479,7 +502,6 @@ class ZarManagerGUI(ctk.CTk):
         btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: webbrowser.open(GITHUB_REPO_URL))
         btn_github.pack(anchor="w", padx=30, pady=20)
         
-        # Sistema de Verificação de Atualizações
         self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
         self.btn_check_update.pack(anchor="w", padx=30, pady=(10, 5))
         
@@ -487,14 +509,12 @@ class ZarManagerGUI(ctk.CTk):
         self.lbl_update_status.pack(anchor="w", padx=30, pady=0)
         
         self.btn_download_update = ctk.CTkButton(frame, text=self.get_text("btn_download_update"), fg_color="#107C10", hover_color="#0B580B", text_color="white")
-        # Oculto por padrão, só aparece se houver atualização
 
     def check_for_updates(self):
         self.btn_check_update.configure(state="disabled")
         self.lbl_update_status.configure(text=self.get_text("msg_checking_update"), text_color="gray")
         self.btn_download_update.pack_forget()
         
-        # Executa em uma thread separada para não travar a interface durante o request
         threading.Thread(target=self._check_for_updates_thread, daemon=True).start()
 
     def _check_for_updates_thread(self):
@@ -530,7 +550,7 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_error(self, error_msg):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=self.get_text("msg_update_error"), text_color="red")
-        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub: {error_msg}")
+        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub. Verifique sua conexão ou a privacidade do repositório.")
 
     def select_frame_by_name(self, name: str):
         self.current_frame_name = name

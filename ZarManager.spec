@@ -6,7 +6,10 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('bin', 'bin')], # Isso é crucial: diz ao PyInstaller para empacotar a pasta bin
+    datas=[
+        ('bin', 'bin'),
+        ('img', 'img') # Instrução nova: Empacota a pasta de imagens
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -30,12 +33,13 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # Não mostrar a tela preta no Windows
+    console=False, 
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='img/icon.ico' # Instrução nova: Aplica o ícone no arquivo .exe do Windows
 )
 
 coll = COLLECT(
