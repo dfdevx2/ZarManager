@@ -1,13 +1,13 @@
-name: Build Windows Executable
+name: Build Windows
 
 on:
   push:
-    branches: [ "main", "master" ] # A ação será disparada quando você fizer um push para a branch main ou master
-  workflow_dispatch: # Permite rodar a ação manualmente no GitHub
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest # Usa uma máquina virtual com Windows
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Define a versão do Python
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |

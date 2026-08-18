@@ -1,22 +1,6 @@
-# Virtual Environments
-venv/
-.venv/
-env/
-
-# Python Cache and Compiled Files
 __pycache__/
-*.py[cod]
-*$py.class
-
-# PyInstaller Build Files
 build/
 dist/
 *.spec
-
-# Local Preferences (Do not commit to avoid overwriting on other machines)
-settings.json
-
-# Temporary Extraction Files and Disk Images
-_extracted_*/
-*.iso
-*.zar
+venv/
+.env/
