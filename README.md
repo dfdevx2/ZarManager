@@ -75,7 +75,8 @@ You can build the executable yourself using PyInstaller.
 ```bash
 pip install pyinstaller
 pyinstaller --noconfirm --onedir --windowed --name "ZarManager" app.py
-cp -r bin dist/ZarManager/  # On Windows, use: xcopy /E /I /Y bin dist\ZarManager\bin
+cp -r bin dist/ZarManager/  # On Windows, use: xcopy /E /I /Y bin dist\ZarManager\bin.
+```
 
 📜 License
 
