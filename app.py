@@ -16,7 +16,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.5"
+APP_VERSION = "v1.0.6"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -90,10 +90,23 @@ class ZarManagerGUI(ctk.CTk):
         
         self.cfg = ConfigManager()
         self.title(f"ZarManager {APP_VERSION}")
-        
-        self.geometry("1050x700")
         self.minsize(900, 600)
         
+        # Otimização 1: Memória de Geometria e Centralização Assíncrona
+        try:
+            saved_geometry = self.cfg.get("window_geometry")
+            if saved_geometry:
+                self.geometry(saved_geometry)
+            else:
+                self.geometry("1050x700")
+                self.after(10, self._center_window)
+        except Exception:
+            self.geometry("1050x700")
+            self.after(10, self._center_window)
+            
+        # Protocolo de Encerramento
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         # ------------------------------------------
         # INJEÇÃO DO ÍCONE DA JANELA (APENAS WINDOWS)
         # ------------------------------------------
@@ -103,7 +116,6 @@ class ZarManagerGUI(ctk.CTk):
             else:
                 base_path = Path(__file__).parent.resolve()
             
-            # O sistema aborta qualquer injeção gráfica se não for Windows
             if platform.system() == "Windows":
                 icon_path = base_path / "img" / "icon.ico"
                 if icon_path.exists():
@@ -124,6 +136,32 @@ class ZarManagerGUI(ctk.CTk):
         self.current_frame_name = "auto"
         self.build_all()
 
+    def _center_window(self):
+        """Centraliza a janela nativamente sem travar a renderização inicial."""
+        self.update_idletasks()
+        largura = self.winfo_width()
+        altura = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (largura // 2)
+        y = (self.winfo_screenheight() // 2) - (altura // 2)
+        self.geometry(f"+{x}+{y}")
+
+    def on_closing(self):
+        """Otimização 2: Kill Switch para fechamento instantâneo."""
+        try:
+            self.cfg.set("window_geometry", self.geometry())
+        except Exception:
+            pass
+
+        # Aborta silenciosamente qualquer núcleo em execução
+        for mode in ["auto", "extract", "compress"]:
+            core = self.tab_data[mode].get("core_instance")
+            if core:
+                try: core.request_cancel()
+                except Exception: pass
+
+        self.destroy()
+        os._exit(0) # Encerra o processo a nível de sistema operacional, matando threads pendentes instantaneamente.
+
     def get_text(self, key: str) -> str:
         return locales.get_text(self.cfg.get("language"), key)
 
@@ -141,9 +179,10 @@ class ZarManagerGUI(ctk.CTk):
         self._build_frames()
         self.select_frame_by_name(self.current_frame_name)
         
-        self.populate_file_list("auto", self.cfg.get("source_dir"))
-        self.populate_file_list("extract", self.cfg.get("source_dir"))
-        self.populate_file_list("compress", self.cfg.get("source_dir"))
+        # Otimização 3: Lazy Loading. Libera a UI para ser desenhada antes de processar arquivos pesados.
+        self.after(50, lambda: self.populate_file_list("auto", self.cfg.get("source_dir")))
+        self.after(100, lambda: self.populate_file_list("extract", self.cfg.get("source_dir")))
+        self.after(150, lambda: self.populate_file_list("compress", self.cfg.get("source_dir")))
 
     def refresh_ui(self):
         for widget in self.winfo_children(): widget.destroy()
