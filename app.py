@@ -1,4 +1,7 @@
+# app.py
+
 import sys
+import tkinter as tk
 import customtkinter as ctk
 import webbrowser
 import threading
@@ -9,6 +12,63 @@ from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
+# ==========================================
+# MOTOR DE DICAS FLUTUANTES (TOOLTIPS)
+# ==========================================
+class ToolTip:
+    """Classe injetada para gerar balões de dica baseados em eventos do mouse."""
+    def __init__(self, widget, text_callback):
+        self.widget = widget
+        self.text_callback = text_callback
+        self.tooltip_window = None
+        self.id = None
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hide()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(600, self.show)
+
+    def unschedule(self):
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def show(self):
+        self.unschedule()
+        if not self.tooltip_window:
+            x, y, cx, cy = self.widget.bbox("insert")
+            x = x + self.widget.winfo_rootx() + 25
+            y = y + cy + self.widget.winfo_rooty() + 25
+            
+            self.tooltip_window = tk.Toplevel(self.widget)
+            self.tooltip_window.wm_overrideredirect(True)
+            self.tooltip_window.wm_geometry(f"+{x}+{y}")
+            
+            texto_dinamico = self.text_callback()
+            label = tk.Label(self.tooltip_window, text=texto_dinamico, justify='left',
+                             background="#1a1a1a", foreground="#ffffff", 
+                             relief='flat', borderwidth=1, highlightbackground="#3B8ED0", highlightthickness=1,
+                             font=("Segoe UI", 11, "normal"), padx=8, pady=6)
+            label.pack(ipadx=1)
+            
+    def hide(self):
+        tw = self.tooltip_window
+        self.tooltip_window = None
+        if tw:
+            tw.destroy()
+
+# ==========================================
+# CONFIGURAÇÃO DE TEMAS E JANELA PRINCIPAL
+# ==========================================
 THEME_COLORS = {
     "Sistema": {"mode": "System", "sidebar": ("gray85", "gray17"), "accent": ("#3B8ED0", "#1F6AA5"), "hover": ("#36719F", "#144870"), "text": ("black", "white")},
     "Branco": {"mode": "Light", "sidebar": ("#EBEBEB", "#EBEBEB"), "accent": ("#3B8ED0", "#3B8ED0"), "hover": ("#36719F", "#36719F"), "text": "black"},
@@ -24,9 +84,15 @@ class ZarManagerGUI(ctk.CTk):
         self.cfg = ConfigManager()
         self.title("ZarManager")
         
-        # Garante a abertura exata na proporção solicitada
-        self.geometry("1150x800")
-        self.minsize(1050, 750)
+        # Fixação de geometria ampla e confortável centralizada
+        self.geometry("1200x850")
+        self.minsize(1200, 850)
+        self.update_idletasks()
+        largura_tela = self.winfo_screenwidth()
+        altura_tela = self.winfo_screenheight()
+        pos_x = int((largura_tela / 2) - (1200 / 2))
+        pos_y = int((altura_tela / 2) - (850 / 2))
+        self.geometry(f"1200x850+{pos_x}+{pos_y}")
         
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -213,12 +279,15 @@ class ZarManagerGUI(ctk.CTk):
         
         self.btn_auto = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_auto"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("auto"))
         self.btn_auto.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        ToolTip(self.btn_auto, lambda: self.get_text("tip_auto"))
         
         self.btn_extract = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_extract"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("extract"))
         self.btn_extract.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        ToolTip(self.btn_extract, lambda: self.get_text("tip_extract"))
         
         self.btn_compress = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_compress"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("compress"))
         self.btn_compress.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+        ToolTip(self.btn_compress, lambda: self.get_text("tip_compress"))
         
         self.btn_settings = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_settings"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("settings"))
         self.btn_settings.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
@@ -246,17 +315,14 @@ class ZarManagerGUI(ctk.CTk):
         self.console_textbox = ctk.CTkTextbox(self.console_frame, font=ctk.CTkFont(family="Monospace", size=13))
         self.console_textbox.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        # 4. SALVAMENTO DE LOGS
         self.log_message(self.get_text("log_ready"))
 
     def log_message(self, message: str):
-        # Escreve na tela
         self.console_textbox.configure(state="normal")
         self.console_textbox.insert("end", message + "\n")
         self.console_textbox.see("end")
         self.console_textbox.configure(state="disabled")
         
-        # Grava no arquivo
         try:
             if getattr(sys, 'frozen', False):
                 base_path = Path(sys.executable).parent
@@ -309,8 +375,10 @@ class ZarManagerGUI(ctk.CTk):
         entry_src = ctk.CTkEntry(src_frame)
         entry_src.pack(side="left", fill="x", expand=True, padx=(0, 10))
         entry_src.insert(0, self.cfg.get("source_dir"))
+        
         btn_src = ctk.CTkButton(src_frame, text="Browse...", width=100, fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.select_folder("source_dir", entry_src, mode))
         btn_src.pack(side="right")
+        ToolTip(btn_src, lambda: self.get_text("tip_source"))
 
         ctk.CTkLabel(dir_frame, text=self.get_text("lbl_target"), font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
         tgt_frame = ctk.CTkFrame(dir_frame, fg_color="transparent")
@@ -318,8 +386,10 @@ class ZarManagerGUI(ctk.CTk):
         entry_tgt = ctk.CTkEntry(tgt_frame)
         entry_tgt.pack(side="left", fill="x", expand=True, padx=(0, 10))
         entry_tgt.insert(0, self.cfg.get("target_dir"))
+        
         btn_tgt = ctk.CTkButton(tgt_frame, text="Browse...", width=100, fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.select_folder("target_dir", entry_tgt))
         btn_tgt.pack(side="right")
+        ToolTip(btn_tgt, lambda: self.get_text("tip_target"))
 
         ctk.CTkLabel(sel_frame, text="Itens Identificados (Selecione para processar):", font=ctk.CTkFont(weight="bold")).grid(row=0, column=1, sticky="sw", padx=(10, 0), pady=(0, 5))
         btn_toggle = ctk.CTkButton(sel_frame, text="Marcar/Desmarcar Todos", width=180, fg_color="gray", hover_color="darkgray", command=lambda m=mode: self.toggle_all_selections(m))
@@ -357,12 +427,15 @@ class ZarManagerGUI(ctk.CTk):
         
         btn_start = ctk.CTkButton(ctrl_frame, text="Iniciar Lote", height=35, font=ctk.CTkFont(weight="bold"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda m=mode: self.start_process(m))
         btn_start.pack(side="left", padx=(0, 10))
+        ToolTip(btn_start, lambda: self.get_text("tip_start"))
         
         btn_pause = ctk.CTkButton(ctrl_frame, text="Pausar Fila", height=35, font=ctk.CTkFont(weight="bold"), fg_color="gray", hover_color="darkgray", state="disabled", command=lambda m=mode: self.toggle_pause_process(m))
         btn_pause.pack(side="left", padx=(0, 10))
+        ToolTip(btn_pause, lambda: self.get_text("tip_pause"))
         
         btn_cancel = ctk.CTkButton(ctrl_frame, text="Cancelar Operação", height=35, font=ctk.CTkFont(weight="bold"), fg_color="#8B0000", hover_color="#660000", text_color="white", state="disabled", command=lambda m=mode: self.cancel_process(m))
         btn_cancel.pack(side="left")
+        ToolTip(btn_cancel, lambda: self.get_text("tip_cancel"))
 
         self.tab_data[mode]["btns"]["start"] = btn_start
         self.tab_data[mode]["btns"]["pause"] = btn_pause

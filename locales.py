@@ -1,57 +1,68 @@
 # locales.py
-# Gerenciamento expandido de idiomas do ZarManager
 
 TRANSLATIONS = {
     "pt-br": {
-        "app_title": "ZarManager - Xbox 360 XDVDFS & ZArchive",
-        "tab_auto": "Automatizado",
+        "app_title": "ZarManager",
+        "tab_auto": "Modo Automatizado",
         "tab_extract": "Apenas Extrair",
         "tab_compress": "Apenas Comprimir",
         "tab_settings": "Configurações",
-        "tab_about": "Sobre o Projeto",
-        "lbl_source": "Diretório de Origem (ISOs):",
-        "lbl_target": "Diretório de Destino (Saída):",
-        "btn_browse": "Selecionar Pasta",
-        "btn_start": "Iniciar Processamento",
-        "btn_stop": "Cancelar Operação",
-        "lbl_workers": "Processos Simultâneos (Threads):",
-        "lbl_language": "Idioma do Sistema:",
+        "tab_about": "Sobre",
+        "lbl_source": "Diretório de Origem:",
+        "lbl_target": "Diretório de Destino:",
+        "lbl_language": "Idioma da Interface:",
         "lbl_theme": "Tema Visual:",
-        "log_ready": "[SISTEMA] Motor gráfico inicializado. Aguardando parâmetros...",
-        "msg_select_dir": "Selecione um diretório válido.",
-        "about_title": "ZarManager v1.0",
-        "about_desc": "Ferramenta definitiva para extração estrutural (XDVDFS) e compressão aleatória (ZArchive) focada no emulador Xenia.",
-        "about_tutorial": "TUTORIAL RÁPIDO:\n1. Vá em Configurações e defina o limite de Threads (recomendado: metade dos seus núcleos lógicos).\n2. Selecione a aba desejada (Automático é recomendado para ISOs brutas).\n3. Selecione a pasta de Origem e a de Destino.\n4. Clique em Iniciar. O sistema fará a limpeza temporária automaticamente.",
-        "btn_github": "Acessar Repositório (GitHub)",
-        "lbl_update": "Update Tracker: Versão mais recente instalada."
+        "lbl_workers": "Threads de Processamento",
+        "log_ready": "Sistema pronto para operação.",
+        "about_title": "Sobre o ZarManager",
+        "about_desc": "Uma ferramenta gráfica multiplataforma para extração e compressão de arquivos XISO.",
+        "about_tutorial": "Instruções:\n1. Selecione o modo de operação na lateral.\n2. Defina os diretórios de origem e destino.\n3. Selecione os arquivos e inicie o lote.",
+        "btn_github": "Acessar Código Fonte",
+        "lbl_update": "Atualizações disponíveis via GitHub Releases.",
+        
+        # Dicas flutuantes (Tooltips)
+        "tip_auto": "Ciclo completo: Extrai a ISO original e compacta imediatamente para o formato .zar.",
+        "tip_extract": "Ferramenta isolada: Apenas extrai os arquivos da ISO para uma pasta.",
+        "tip_compress": "Ferramenta isolada: Apenas compacta uma pasta já extraída para o formato .zar.",
+        "tip_source": "Selecione a pasta raiz onde os seus arquivos ou ISOs estão armazenados.",
+        "tip_target": "Selecione o local exato onde os arquivos processados deverão ser salvos.",
+        "tip_start": "Inicia o processamento massivo da fila selecionada.",
+        "tip_pause": "Congela a fila. Tarefas ativas terminarão, mas novas não serão iniciadas.",
+        "tip_cancel": "Aborta criticamente o processo e destrói os arquivos temporários criados."
     },
     "en": {
-        "app_title": "ZarManager - Xbox 360 XDVDFS & ZArchive",
-        "tab_auto": "Automated (All-in-One)",
+        "app_title": "ZarManager",
+        "tab_auto": "Automated Pipeline",
         "tab_extract": "Extract Only",
         "tab_compress": "Compress Only",
         "tab_settings": "Settings",
-        "tab_about": "About Project",
-        "lbl_source": "Source Directory (ISOs):",
-        "lbl_target": "Target Directory (Output):",
-        "btn_browse": "Browse Folder",
-        "btn_start": "Start Processing",
-        "btn_stop": "Cancel Operation",
-        "lbl_workers": "Simultaneous Processes (Threads):",
-        "lbl_language": "System Language:",
+        "tab_about": "About",
+        "lbl_source": "Source Directory:",
+        "lbl_target": "Target Directory:",
+        "lbl_language": "Interface Language:",
         "lbl_theme": "Visual Theme:",
-        "log_ready": "[SYSTEM] GUI Engine initialized. Awaiting parameters...",
-        "msg_select_dir": "Please select a valid directory.",
-        "about_title": "ZarManager v1.0",
-        "about_desc": "Definitive tool for structural extraction (XDVDFS) and random-access compression (ZArchive) focused on the Xenia emulator.",
-        "about_tutorial": "QUICK TUTORIAL:\n1. Go to Settings and define the Thread limit (recommended: half of your logical cores).\n2. Select the desired tab (Automated is recommended for raw ISOs).\n3. Select the Source and Target folders.\n4. Click Start. The system will handle temporary cleaning automatically.",
-        "btn_github": "Visit Repository (GitHub)",
-        "lbl_update": "Update Tracker: Latest version installed."
+        "lbl_workers": "Processing Threads",
+        "log_ready": "System ready for operation.",
+        "about_title": "About ZarManager",
+        "about_desc": "A cross-platform GUI tool for XISO extraction and compression.",
+        "about_tutorial": "Instructions:\n1. Select the operation mode on the sidebar.\n2. Set the source and target directories.\n3. Select the files and start the batch.",
+        "btn_github": "Access Source Code",
+        "lbl_update": "Updates available via GitHub Releases.",
+        
+        # Floating tooltips
+        "tip_auto": "Full cycle: Extracts the original ISO and immediately compresses it to .zar format.",
+        "tip_extract": "Isolated tool: Only extracts files from the ISO into a folder.",
+        "tip_compress": "Isolated tool: Only compresses an already extracted folder into .zar format.",
+        "tip_source": "Select the root folder where your files or ISOs are stored.",
+        "tip_target": "Select the exact location where the processed files should be saved.",
+        "tip_start": "Starts mass processing of the selected queue.",
+        "tip_pause": "Freezes the queue. Active tasks will finish, but no new ones will start.",
+        "tip_cancel": "Critically aborts the process and destroys created temporary files."
     }
 }
 
-def get_text(lang_code: str, key: str) -> str:
-    try:
-        return TRANSLATIONS[lang_code][key]
-    except KeyError:
-        return TRANSLATIONS["en"].get(key, f"[{key}]")
+def get_text(lang: str, key: str) -> str:
+    """Retorna o texto correspondente à chave no idioma especificado."""
+    if lang not in TRANSLATIONS:
+        lang = "pt-br"
+    return TRANSLATIONS[lang].get(key, key)
