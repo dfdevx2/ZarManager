@@ -111,10 +111,12 @@ class ZarManagerGUI(ctk.CTk):
             else:
                 icon_path = base_path / "img" / "logo.png"
                 if icon_path.exists():
-                    img = tk.PhotoImage(file=str(icon_path))
-                    self.iconphoto(False, img)
-        except Exception:
-            pass
+                    # MUDANÇA AQUI: Salvando em 'self' para o Python não apagar da memória
+                    self.icon_img = tk.PhotoImage(file=str(icon_path))
+                    self.iconphoto(False, self.icon_img)
+        except Exception as e:
+            # Em caso de falha no Wayland/X11, imprime no terminal interno, mas não trava o app
+            print(f"Erro ao carregar icone: {e}")
         # ------------------------------------------
 
         self.grid_rowconfigure(0, weight=1)
