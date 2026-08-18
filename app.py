@@ -16,7 +16,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.4"
+APP_VERSION = "v1.0.5"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -91,12 +91,11 @@ class ZarManagerGUI(ctk.CTk):
         self.cfg = ConfigManager()
         self.title(f"ZarManager {APP_VERSION}")
         
-        # Geometria dinâmica delegada ao sistema operacional
         self.geometry("1050x700")
         self.minsize(900, 600)
         
         # ------------------------------------------
-        # INJEÇÃO DO ÍCONE DA JANELA (CROSS-PLATFORM)
+        # INJEÇÃO DO ÍCONE DA JANELA (APENAS WINDOWS)
         # ------------------------------------------
         try:
             if getattr(sys, 'frozen', False):
@@ -104,19 +103,13 @@ class ZarManagerGUI(ctk.CTk):
             else:
                 base_path = Path(__file__).parent.resolve()
             
+            # O sistema aborta qualquer injeção gráfica se não for Windows
             if platform.system() == "Windows":
                 icon_path = base_path / "img" / "icon.ico"
                 if icon_path.exists():
                     self.iconbitmap(str(icon_path))
-            else:
-                icon_path = base_path / "img" / "logo.png"
-                if icon_path.exists():
-                    # MUDANÇA AQUI: Salvando em 'self' para o Python não apagar da memória
-                    self.icon_img = tk.PhotoImage(file=str(icon_path))
-                    self.iconphoto(False, self.icon_img)
-        except Exception as e:
-            # Em caso de falha no Wayland/X11, imprime no terminal interno, mas não trava o app
-            print(f"Erro ao carregar icone: {e}")
+        except Exception:
+            pass
         # ------------------------------------------
 
         self.grid_rowconfigure(0, weight=1)
