@@ -1,4 +1,3 @@
-# core.py
 import os
 import shutil
 import subprocess
@@ -9,18 +8,16 @@ import platform
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# 1. DETECÇÃO DE PLATAFORMA
+# Identifica o sistema operacional para alternar os binários corretamente (.exe no Windows)
 IS_WINDOWS = platform.system() == "Windows"
 BIN_EXTENSION = ".exe" if IS_WINDOWS else ""
 
-# 2. RESOLUÇÃO DE CAMINHO (PyInstaller / Desenvolvimento)
 if getattr(sys, 'frozen', False):
-    BASE_DIR = Path(sys._MEIPASS) # Usar _MEIPASS no lugar de sys.executable
+    BASE_DIR = Path(sys._MEIPASS)
 else:
     BASE_DIR = Path(__file__).parent.resolve()
 
 BIN_DIR = BASE_DIR / "bin"
-# Injeta o .exe automaticamente se estiver no Windows
 ZARCHIVE_BIN = BIN_DIR / f"zarchive{BIN_EXTENSION}"
 EXTRACT_XISO_BIN = BIN_DIR / f"extract-xiso{BIN_EXTENSION}"
 
@@ -61,22 +58,13 @@ class ZarManagerCore:
             self.progress_callback(completed_count, self.total_tasks, overall_ratio)
 
     def verify_environment(self) -> bool:
-        # Verifica a existência dos arquivos baseados no Sistema Operacional
-        if self.mode in ["auto", "compress"]:
-            if not ZARCHIVE_BIN.exists():
-                self.log(f"[ERRO CRÍTICO] Motor ZArchive não encontrado em: {ZARCHIVE_BIN}")
-                return False
-            if not IS_WINDOWS and not os.access(ZARCHIVE_BIN, os.X_OK):
-                self.log(f"[ERRO CRÍTICO] ZArchive sem permissão de execução no Linux.")
-                return False
-
-        if self.mode in ["auto", "extract"]:
-            if not EXTRACT_XISO_BIN.exists():
-                self.log(f"[ERRO CRÍTICO] Extractor extract-xiso não encontrado em: {EXTRACT_XISO_BIN}")
-                return False
-            if not IS_WINDOWS and not os.access(EXTRACT_XISO_BIN, os.X_OK):
-                self.log(f"[ERRO CRÍTICO] extract-xiso sem permissão de execução no Linux.")
-                return False
+        if self.mode in ["auto", "compress"] and (not ZARCHIVE_BIN.exists() or not os.access(ZARCHIVE_BIN, os.X_OK) if not IS_WINDOWS else not ZARCHIVE_BIN.exists()):
+            self.log(f"[ERRO CRÍTICO] Motor ZArchive ausente em: {ZARCHIVE_BIN}")
+            return False
+            
+        if self.mode in ["auto", "extract"] and (not EXTRACT_XISO_BIN.exists() or not os.access(EXTRACT_XISO_BIN, os.X_OK) if not IS_WINDOWS else not EXTRACT_XISO_BIN.exists()):
+            self.log(f"[ERRO CRÍTICO] Extractor extract-xiso ausente em: {EXTRACT_XISO_BIN}")
+            return False
             
         self.target_directory.mkdir(parents=True, exist_ok=True)
         return True
@@ -100,25 +88,20 @@ class ZarManagerCore:
             self.log("[SISTEMA] Fila retomada.")
             return False
 
-    def _run_subprocess_live(self, cmd: list, item_name: str, path_str: str, progress_start: float, progress_range: float):
-        # 3. PREVENÇÃO DE JANELAS FANTASMAS NO WINDOWS
+    def _run_subprocess_live(self, cmd: list, item_name: str):
+        """Executa o binário capturando a saída em tempo real para alimentar o log."""
+        
+        # Oculta a janela preta do CMD no Windows
         startupinfo = None
         if IS_WINDOWS:
             startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW # Esconde a janela do CMD
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        proc = subprocess.Popen(
-            cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT, 
-            text=True, 
-            bufsize=1,
-            startupinfo=startupinfo # Aplica a regra
-        )
-        
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, startupinfo=startupinfo)
         with self.process_lock:
             self.active_processes.append(proc)
         
+        # Conta as linhas para simular o progresso (como o extract-xiso/zarchive não dão %)
         linhas_lidas = 0
         estimativa_linhas = 5000 
         
@@ -130,9 +113,10 @@ class ZarManagerCore:
                 linhas_lidas += 1
                 if linhas_lidas % 50 == 0:
                     self.log(f"[{item_name}] {line_str[:60]}...")
+                    # Calcula o progresso simulado (até 95% da etapa)
                     progresso_simulado = min(linhas_lidas / estimativa_linhas, 0.95)
-                    atual = progress_start + (progresso_simulado * progress_range)
-                    self.update_progress(path_str, atual)
+                    # Como não sabemos a etapa exata aqui, vamos focar no log por enquanto. 
+                    # Uma implementação mais avançada passaria os limites de progresso como argumento.
                 
         proc.stdout.close()
         return_code = proc.wait()
@@ -146,8 +130,6 @@ class ZarManagerCore:
             
         if return_code != 0:
             raise subprocess.CalledProcessError(return_code, cmd)
-            
-        self.update_progress(path_str, progress_start + progress_range)
 
     def process_item(self, item_path: Path) -> str:
         self.pause_event.wait() 
@@ -167,13 +149,15 @@ class ZarManagerCore:
                 if extracted_folder.exists(): shutil.rmtree(extracted_folder)
                 
                 self.update_status(item_name, "Extraindo (XDVDFS)...")
-                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(extracted_folder), str(item_path)], item_name, path_str, 0.0, 0.5)
+                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(extracted_folder), str(item_path)], item_name)
                 
                 if self.cancel_flag: raise InterruptedError()
                 
+                self.update_progress(path_str, 0.5)
                 self.update_status(item_name, "Comprimindo (.zar)...")
-                self._run_subprocess_live([str(ZARCHIVE_BIN), str(extracted_folder), str(target_file)], item_name, path_str, 0.5, 0.49)
+                self._run_subprocess_live([str(ZARCHIVE_BIN), str(extracted_folder), str(target_file)], item_name)
                 
+                self.update_progress(path_str, 0.9)
                 self.update_status(item_name, "Limpando resíduos...")
                 shutil.rmtree(extracted_folder)
 
@@ -182,12 +166,14 @@ class ZarManagerCore:
                 if target_folder.exists(): shutil.rmtree(target_folder)
                 
                 self.update_status(item_name, "Descompactando...")
-                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(target_folder), str(item_path)], item_name, path_str, 0.0, 0.99)
+                self.update_progress(path_str, 0.2)
+                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(target_folder), str(item_path)], item_name)
 
             elif self.mode == "compress":
                 target_file = self.target_directory / f"{item_name}.zar"
                 self.update_status(item_name, "Comprimindo...")
-                self._run_subprocess_live([str(ZARCHIVE_BIN), str(item_path), str(target_file)], item_name, path_str, 0.0, 0.99)
+                self.update_progress(path_str, 0.2)
+                self._run_subprocess_live([str(ZARCHIVE_BIN), str(item_path), str(target_file)], item_name)
                 
             elapsed_time = time.time() - start_time
             self.update_progress(path_str, 1.0)

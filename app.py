@@ -1,6 +1,4 @@
-# app.py
-# Interface Gráfica Definitiva - ZarManager v1.0 (Com Porcentagem e Geometria Fixa)
-
+import sys
 import customtkinter as ctk
 import webbrowser
 import threading
@@ -247,13 +245,30 @@ class ZarManagerGUI(ctk.CTk):
         
         self.console_textbox = ctk.CTkTextbox(self.console_frame, font=ctk.CTkFont(family="Monospace", size=13))
         self.console_textbox.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # 4. SALVAMENTO DE LOGS
         self.log_message(self.get_text("log_ready"))
 
     def log_message(self, message: str):
+        # Escreve na tela
         self.console_textbox.configure(state="normal")
         self.console_textbox.insert("end", message + "\n")
         self.console_textbox.see("end")
         self.console_textbox.configure(state="disabled")
+        
+        # Grava no arquivo
+        try:
+            if getattr(sys, 'frozen', False):
+                base_path = Path(sys.executable).parent
+            else:
+                base_path = Path(__file__).parent.resolve()
+                
+            log_file = base_path / "ZarManager_Log.txt"
+            
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(message + "\n")
+        except Exception:
+            pass
 
     def _build_frames(self):
         self.frames = {}
@@ -320,7 +335,6 @@ class ZarManagerGUI(ctk.CTk):
         self.tab_data[mode]["tasks_frame"] = ctk.CTkFrame(bot_frame, fg_color=("gray85", "gray15"), corner_radius=5)
         self.tab_data[mode]["tasks_frame"].grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
-        # Sub-frame para alinhar o contador e a porcentagem perfeitamente
         info_frame = ctk.CTkFrame(bot_frame, fg_color="transparent")
         info_frame.grid(row=1, column=0, sticky="ew", pady=(0, 5))
         info_frame.grid_columnconfigure(0, weight=1)
