@@ -9,6 +9,8 @@ import os
 import urllib.request
 import json
 import platform
+import ssl
+import subprocess
 from pathlib import Path
 from tkinter import filedialog
 from config import ConfigManager
@@ -16,7 +18,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.6"
+APP_VERSION = "v1.0.8"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -92,7 +94,6 @@ class ZarManagerGUI(ctk.CTk):
         self.title(f"ZarManager {APP_VERSION}")
         self.minsize(900, 600)
         
-        # Otimização 1: Memória de Geometria e Centralização Assíncrona
         try:
             saved_geometry = self.cfg.get("window_geometry")
             if saved_geometry:
@@ -104,7 +105,6 @@ class ZarManagerGUI(ctk.CTk):
             self.geometry("1050x700")
             self.after(10, self._center_window)
             
-        # Protocolo de Encerramento
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # ------------------------------------------
@@ -137,7 +137,6 @@ class ZarManagerGUI(ctk.CTk):
         self.build_all()
 
     def _center_window(self):
-        """Centraliza a janela nativamente sem travar a renderização inicial."""
         self.update_idletasks()
         largura = self.winfo_width()
         altura = self.winfo_height()
@@ -146,13 +145,11 @@ class ZarManagerGUI(ctk.CTk):
         self.geometry(f"+{x}+{y}")
 
     def on_closing(self):
-        """Otimização 2: Kill Switch para fechamento instantâneo."""
         try:
             self.cfg.set("window_geometry", self.geometry())
         except Exception:
             pass
 
-        # Aborta silenciosamente qualquer núcleo em execução
         for mode in ["auto", "extract", "compress"]:
             core = self.tab_data[mode].get("core_instance")
             if core:
@@ -160,7 +157,20 @@ class ZarManagerGUI(ctk.CTk):
                 except Exception: pass
 
         self.destroy()
-        os._exit(0) # Encerra o processo a nível de sistema operacional, matando threads pendentes instantaneamente.
+        os._exit(0) 
+
+    # ==========================================
+    # CORREÇÃO PARA ABRIR NAVEGADOR NO LINUX
+    # ==========================================
+    def open_browser(self, url):
+        """Força o uso do comando nativo no Linux para evitar falhas do PyInstaller"""
+        if platform.system() == "Linux":
+            try:
+                subprocess.Popen(['xdg-open', url])
+            except Exception:
+                webbrowser.open(url)
+        else:
+            webbrowser.open(url)
 
     def get_text(self, key: str) -> str:
         return locales.get_text(self.cfg.get("language"), key)
@@ -179,7 +189,6 @@ class ZarManagerGUI(ctk.CTk):
         self._build_frames()
         self.select_frame_by_name(self.current_frame_name)
         
-        # Otimização 3: Lazy Loading. Libera a UI para ser desenhada antes de processar arquivos pesados.
         self.after(50, lambda: self.populate_file_list("auto", self.cfg.get("source_dir")))
         self.after(100, lambda: self.populate_file_list("extract", self.cfg.get("source_dir")))
         self.after(150, lambda: self.populate_file_list("compress", self.cfg.get("source_dir")))
@@ -533,7 +542,8 @@ class ZarManagerGUI(ctk.CTk):
         tutorial_frame.pack(fill="x", padx=30, pady=10)
         ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
         
-        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: webbrowser.open(GITHUB_REPO_URL))
+        # MUDANÇA: Usa a nova função open_browser para compatibilidade com o Linux
+        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.open_browser(GITHUB_REPO_URL))
         btn_github.pack(anchor="w", padx=30, pady=20)
         
         self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
@@ -553,8 +563,11 @@ class ZarManagerGUI(ctk.CTk):
 
     def _check_for_updates_thread(self):
         try:
+            # CORREÇÃO PARA O LINUX: Ignora erro de verificação de SSL que o PyInstaller causa
+            context = ssl._create_unverified_context()
+            
             req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
-            with urllib.request.urlopen(req, timeout=7) as response:
+            with urllib.request.urlopen(req, timeout=7, context=context) as response:
                 data = json.loads(response.read().decode())
                 latest_version = data.get("tag_name", "")
                 release_url = data.get("html_url", GITHUB_REPO_URL + "/releases")
@@ -572,7 +585,8 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_found(self, msg, url):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="green")
-        self.btn_download_update.configure(command=lambda: webbrowser.open(url))
+        # MUDANÇA: Usa a nova função open_browser
+        self.btn_download_update.configure(command=lambda: self.open_browser(url))
         self.btn_download_update.pack(anchor="w", padx=30, pady=(5, 10))
         self.log_message(f"[SISTEMA] Atualização detectada: {msg}")
 
@@ -584,7 +598,7 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_error(self, error_msg):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=self.get_text("msg_update_error"), text_color="red")
-        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub. Verifique sua conexão ou a privacidade do repositório.")
+        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub: {error_msg}")
 
     def select_frame_by_name(self, name: str):
         self.current_frame_name = name
