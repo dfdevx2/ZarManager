@@ -6,17 +6,23 @@ import customtkinter as ctk
 import webbrowser
 import threading
 import os
+import urllib.request
+import json
 from pathlib import Path
 from tkinter import filedialog
 from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
+# Controle de Versão Interna
+APP_VERSION = "v1.0.3"
+GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
+GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
+
 # ==========================================
 # MOTOR DE DICAS FLUTUANTES (TOOLTIPS)
 # ==========================================
 class ToolTip:
-    """Classe injetada para gerar balões de dica baseados em eventos do mouse."""
     def __init__(self, widget, text_callback):
         self.widget = widget
         self.text_callback = text_callback
@@ -82,17 +88,11 @@ class ZarManagerGUI(ctk.CTk):
         super().__init__()
         
         self.cfg = ConfigManager()
-        self.title("ZarManager")
+        self.title(f"ZarManager {APP_VERSION}")
         
-        # Fixação de geometria ampla e confortável centralizada
-        self.geometry("1200x850")
-        self.minsize(1200, 850)
-        self.update_idletasks()
-        largura_tela = self.winfo_screenwidth()
-        altura_tela = self.winfo_screenheight()
-        pos_x = int((largura_tela / 2) - (1200 / 2))
-        pos_y = int((altura_tela / 2) - (850 / 2))
-        self.geometry(f"1200x850+{pos_x}+{pos_y}")
+        # Geometria dinâmica delegada ao sistema operacional
+        self.geometry("1050x700")
+        self.minsize(900, 600)
         
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -117,7 +117,7 @@ class ZarManagerGUI(ctk.CTk):
 
     def build_all(self):
         self.apply_appearance()
-        self.title(self.get_text("app_title"))
+        self.title(f"{self.get_text('app_title')} {APP_VERSION}")
         self._build_sidebar()
         self._build_main_area()
         self._build_frames()
@@ -465,14 +465,72 @@ class ZarManagerGUI(ctk.CTk):
     def _populate_about_frame(self, frame):
         lbl_title = ctk.CTkLabel(frame, text=self.get_text("about_title"), font=ctk.CTkFont(size=24, weight="bold"))
         lbl_title.pack(anchor="w", padx=30, pady=(30, 10))
+        
+        lbl_version = ctk.CTkLabel(frame, text=f"Versão Atual: {APP_VERSION}", font=ctk.CTkFont(weight="bold"))
+        lbl_version.pack(anchor="w", padx=30, pady=(0, 10))
+        
         lbl_desc = ctk.CTkLabel(frame, text=self.get_text("about_desc"), wraplength=700, justify="left")
         lbl_desc.pack(anchor="w", padx=30, pady=(0, 20))
+        
         tutorial_frame = ctk.CTkFrame(frame, fg_color=("gray85", "gray15"), corner_radius=10)
         tutorial_frame.pack(fill="x", padx=30, pady=10)
         ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
-        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: webbrowser.open("https://github.com/SeuUsuario/ZarManager"))
+        
+        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: webbrowser.open(GITHUB_REPO_URL))
         btn_github.pack(anchor="w", padx=30, pady=20)
-        ctk.CTkLabel(frame, text=self.get_text("lbl_update"), font=ctk.CTkFont(weight="bold", slant="italic")).pack(anchor="w", padx=30, pady=10)
+        
+        # Sistema de Verificação de Atualizações
+        self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
+        self.btn_check_update.pack(anchor="w", padx=30, pady=(10, 5))
+        
+        self.lbl_update_status = ctk.CTkLabel(frame, text="", font=ctk.CTkFont(slant="italic"))
+        self.lbl_update_status.pack(anchor="w", padx=30, pady=0)
+        
+        self.btn_download_update = ctk.CTkButton(frame, text=self.get_text("btn_download_update"), fg_color="#107C10", hover_color="#0B580B", text_color="white")
+        # Oculto por padrão, só aparece se houver atualização
+
+    def check_for_updates(self):
+        self.btn_check_update.configure(state="disabled")
+        self.lbl_update_status.configure(text=self.get_text("msg_checking_update"), text_color="gray")
+        self.btn_download_update.pack_forget()
+        
+        # Executa em uma thread separada para não travar a interface durante o request
+        threading.Thread(target=self._check_for_updates_thread, daemon=True).start()
+
+    def _check_for_updates_thread(self):
+        try:
+            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
+            with urllib.request.urlopen(req, timeout=7) as response:
+                data = json.loads(response.read().decode())
+                latest_version = data.get("tag_name", "")
+                release_url = data.get("html_url", GITHUB_REPO_URL + "/releases")
+                
+                if latest_version and latest_version != APP_VERSION:
+                    msg = self.get_text("msg_update_avail").format(latest_version)
+                    self.after(0, lambda: self._update_ui_update_found(msg, release_url))
+                else:
+                    msg = self.get_text("msg_update_latest").format(APP_VERSION)
+                    self.after(0, lambda: self._update_ui_update_none(msg))
+                    
+        except Exception as e:
+            self.after(0, lambda: self._update_ui_update_error(str(e)))
+
+    def _update_ui_update_found(self, msg, url):
+        self.btn_check_update.configure(state="normal")
+        self.lbl_update_status.configure(text=msg, text_color="green")
+        self.btn_download_update.configure(command=lambda: webbrowser.open(url))
+        self.btn_download_update.pack(anchor="w", padx=30, pady=(5, 10))
+        self.log_message(f"[SISTEMA] Atualização detectada: {msg}")
+
+    def _update_ui_update_none(self, msg):
+        self.btn_check_update.configure(state="normal")
+        self.lbl_update_status.configure(text=msg, text_color="gray")
+        self.log_message(f"[SISTEMA] Verificação concluída. Nenhuma atualização pendente.")
+
+    def _update_ui_update_error(self, error_msg):
+        self.btn_check_update.configure(state="normal")
+        self.lbl_update_status.configure(text=self.get_text("msg_update_error"), text_color="red")
+        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub: {error_msg}")
 
     def select_frame_by_name(self, name: str):
         self.current_frame_name = name

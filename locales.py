@@ -18,7 +18,12 @@ TRANSLATIONS = {
         "about_desc": "Uma ferramenta gráfica multiplataforma para extração e compressão de arquivos XISO.",
         "about_tutorial": "Instruções:\n1. Selecione o modo de operação na lateral.\n2. Defina os diretórios de origem e destino.\n3. Selecione os arquivos e inicie o lote.",
         "btn_github": "Acessar Código Fonte",
-        "lbl_update": "Atualizações disponíveis via GitHub Releases.",
+        "btn_check_update": "Verificar Atualizações",
+        "btn_download_update": "Baixar Nova Versão",
+        "msg_checking_update": "Consultando os servidores do GitHub...",
+        "msg_update_avail": "Nova versão ({}) disponível!",
+        "msg_update_latest": "O sistema está atualizado (Versão {}).",
+        "msg_update_error": "Falha na comunicação com o servidor.",
         
         # Dicas flutuantes (Tooltips)
         "tip_auto": "Ciclo completo: Extrai a ISO original e compacta imediatamente para o formato .zar.",
@@ -47,7 +52,12 @@ TRANSLATIONS = {
         "about_desc": "A cross-platform GUI tool for XISO extraction and compression.",
         "about_tutorial": "Instructions:\n1. Select the operation mode on the sidebar.\n2. Set the source and target directories.\n3. Select the files and start the batch.",
         "btn_github": "Access Source Code",
-        "lbl_update": "Updates available via GitHub Releases.",
+        "btn_check_update": "Check for Updates",
+        "btn_download_update": "Download New Version",
+        "msg_checking_update": "Querying GitHub servers...",
+        "msg_update_avail": "New version ({}) available!",
+        "msg_update_latest": "System is up to date (Version {}).",
+        "msg_update_error": "Failed to communicate with the server.",
         
         # Floating tooltips
         "tip_auto": "Full cycle: Extracts the original ISO and immediately compresses it to .zar format.",
@@ -62,7 +72,6 @@ TRANSLATIONS = {
 }
 
 def get_text(lang: str, key: str) -> str:
-    """Retorna o texto correspondente à chave no idioma especificado."""
     if lang not in TRANSLATIONS:
         lang = "pt-br"
     return TRANSLATIONS[lang].get(key, key)
