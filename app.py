@@ -18,7 +18,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.12"
+APP_VERSION = "v1.0.13"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -140,6 +140,9 @@ class ZarManagerGUI(ctk.CTk):
         self.current_frame_name = "auto"
         self.build_all()
 
+        # Inicia a verificação silenciosa de atualização (Delay de 2 segundos para não pesar o startup)
+        self.after(2000, self.check_for_updates_silently)
+
     def _center_window(self):
         self.update_idletasks()
         largura = self.winfo_width()
@@ -164,10 +167,25 @@ class ZarManagerGUI(ctk.CTk):
         os._exit(0) 
 
     # ==========================================
-    # CORREÇÃO DEFINITIVA DO NAVEGADOR
+    # GATILHO SONORO (CROSS-PLATFORM)
     # ==========================================
+    def play_sound(self, sound_type="success"):
+        """Toca efeito sonoro em uma thread separada para evitar congelamento visual"""
+        def _play():
+            try:
+                if platform.system() == "Windows":
+                    import winsound
+                    if sound_type == "success":
+                        winsound.MessageBeep(winsound.MB_OK)
+                    elif sound_type == "error":
+                        winsound.MessageBeep(winsound.MB_ICONHAND)
+                else:
+                    self.bell() # Fallback seguro no Linux
+            except Exception:
+                pass
+        threading.Thread(target=_play, daemon=True).start()
+
     def open_browser(self, url):
-        """Dispara a abertura do link em uma thread isolada para nunca travar a interface"""
         def _open():
             try:
                 if platform.system() == "Linux":
@@ -179,7 +197,6 @@ class ZarManagerGUI(ctk.CTk):
                     webbrowser.open_new(url)
                 except Exception:
                     self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
-                    
         threading.Thread(target=_open, daemon=True).start()
 
     def get_text(self, key: str) -> str:
@@ -358,8 +375,16 @@ class ZarManagerGUI(ctk.CTk):
         self.after(0, lambda: self.tab_data[mode]["progress"].set(ratio))
         self.after(0, lambda: self.tab_data[mode]["lbl_percentage"].configure(text=f"{pct}%"))
         self.after(0, lambda: self.tab_data[mode]["lbl_counter"].configure(text=f"{current} / {total} itens concluídos"))
+        
+        # Dispara o som de Sucesso ao finalizar todo o lote
+        if current == total and total > 0:
+            self.play_sound("success")
 
     def _update_task_status_from_thread(self, mode: str, item_name: str, status: str):
+        # Dispara som de erro caso uma etapa falhe gravemente
+        if "FALHA" in status.upper():
+            self.play_sound("error")
+            
         def update_ui():
             tasks_dict = self.tab_data[mode]["active_tasks"]
             frame = self.tab_data[mode]["tasks_frame"]
@@ -567,9 +592,19 @@ class ZarManagerGUI(ctk.CTk):
         ctk.CTkLabel(frame, text=f'{self.get_text("lbl_workers")} (Atual: {self.cfg.get("workers")})').pack(anchor="w", padx=30, pady=(10, 0))
         slider_workers = ctk.CTkSlider(frame, from_=1, to=16, number_of_steps=15, width=400, button_color=self.theme_data["accent"], button_hover_color=self.theme_data["hover"], progress_color=self.theme_data["accent"], command=self.on_worker_slider_change)
         slider_workers.set(self.cfg.get("workers"))
-        slider_workers.pack(anchor="w", padx=30, pady=(5, 5))
+        slider_workers.pack(anchor="w", padx=30, pady=(5, 15))
         
-        ctk.CTkLabel(frame, text="Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.", text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(0, 20))
+        # MUDANÇA: Switcher de Auto-Update
+        auto_val = self.cfg.get("auto_update")
+        if auto_val is None:
+            auto_val = True
+            self.cfg.set("auto_update", True)
+            
+        self.auto_update_var = ctk.BooleanVar(value=auto_val)
+        switch_auto = ctk.CTkSwitch(frame, text=self.get_text("lbl_auto_update"), variable=self.auto_update_var, command=self.on_auto_update_change, progress_color=self.theme_data["accent"])
+        switch_auto.pack(anchor="w", padx=30, pady=(10, 15))
+        
+        ctk.CTkLabel(frame, text="Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.", text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(10, 20))
 
     def _populate_about_frame(self, frame):
         lbl_title = ctk.CTkLabel(frame, text=self.get_text("about_title"), font=ctk.CTkFont(size=24, weight="bold"))
@@ -600,8 +635,35 @@ class ZarManagerGUI(ctk.CTk):
         self.btn_check_update.configure(state="disabled")
         self.lbl_update_status.configure(text=self.get_text("msg_checking_update"), text_color="gray")
         self.btn_download_update.pack_forget()
-        
         threading.Thread(target=self._check_for_updates_thread, daemon=True).start()
+
+    def check_for_updates_silently(self):
+        """Verifica em segundo plano caso a opção esteja ativa nas configurações"""
+        if not self.cfg.get("auto_update"): 
+            return
+        threading.Thread(target=self._silent_update_thread, daemon=True).start()
+
+    def _silent_update_thread(self):
+        try:
+            context = ssl._create_unverified_context()
+            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
+            with urllib.request.urlopen(req, timeout=7, context=context) as response:
+                data = json.loads(response.read().decode())
+                latest_version = data.get("tag_name", "")
+                release_url = data.get("html_url", GITHUB_REPO_URL + "/releases")
+                
+                if latest_version and latest_version != APP_VERSION:
+                    self.after(0, lambda: self._show_update_popup(latest_version, release_url))
+        except Exception:
+            pass # Silenciamento total em caso de falha na checagem em segundo plano
+
+    def _show_update_popup(self, version, url):
+        resposta = messagebox.askyesno(
+            title=self.get_text("msg_update_popup_title"),
+            message=self.get_text("msg_update_popup_desc").format(version)
+        )
+        if resposta:
+            self.open_browser(url)
 
     def _check_for_updates_thread(self):
         try:
@@ -666,6 +728,9 @@ class ZarManagerGUI(ctk.CTk):
 
     def on_worker_slider_change(self, value):
         self.cfg.set("workers", int(value))
+
+    def on_auto_update_change(self):
+        self.cfg.set("auto_update", self.auto_update_var.get())
 
 if __name__ == "__main__":
     app = ZarManagerGUI()

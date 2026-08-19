@@ -13,6 +13,7 @@ TRANSLATIONS = {
         "lbl_language": "Idioma da Interface:",
         "lbl_theme": "Tema Visual:",
         "lbl_workers": "Threads de Processamento",
+        "lbl_auto_update": "Verificar atualizações automaticamente ao abrir",
         "log_ready": "Sistema pronto para operação.",
         "about_title": "Sobre o ZarManager",
         "about_desc": "Uma ferramenta gráfica multiplataforma para extração e compressão de arquivos XISO.",
@@ -25,10 +26,12 @@ TRANSLATIONS = {
         "msg_update_latest": "O sistema está atualizado (Versão {}).",
         "msg_update_error": "Falha na comunicação com o servidor.",
         
-        # Caixa de Conflitos
+        # Popups
         "msg_collision_title": "Conflito de Arquivos",
         "msg_collision_desc": "Alguns itens selecionados já existem no diretório de destino.\n\n• Sim: Sobrescrever todos os existentes.\n• Não: Pular os existentes e processar apenas os novos.\n• Cancelar: Abortar a operação.",
         "msg_queue_empty": "Todos os itens conflitantes foram pulados. A fila está vazia.",
+        "msg_update_popup_title": "Nova Versão Disponível",
+        "msg_update_popup_desc": "A versão {} do ZarManager foi lançada!\n\nDeseja abrir o navegador para baixar a atualização agora?",
 
         # Dicas flutuantes (Tooltips)
         "tip_auto": "Ciclo completo: Extrai a ISO original e compacta imediatamente para o formato .zar.",
@@ -52,6 +55,7 @@ TRANSLATIONS = {
         "lbl_language": "Interface Language:",
         "lbl_theme": "Visual Theme:",
         "lbl_workers": "Processing Threads",
+        "lbl_auto_update": "Check for updates automatically on startup",
         "log_ready": "System ready for operation.",
         "about_title": "About ZarManager",
         "about_desc": "A cross-platform GUI tool for XISO extraction and compression.",
@@ -64,10 +68,12 @@ TRANSLATIONS = {
         "msg_update_latest": "System is up to date (Version {}).",
         "msg_update_error": "Failed to communicate with the server.",
         
-        # Conflict Box
+        # Popups
         "msg_collision_title": "File Collision",
         "msg_collision_desc": "Some selected items already exist in the target directory.\n\n• Yes: Overwrite all existing files.\n• No: Skip existing files and process only new ones.\n• Cancel: Abort the operation.",
         "msg_queue_empty": "All conflicting items were skipped. The queue is empty.",
+        "msg_update_popup_title": "New Version Available",
+        "msg_update_popup_desc": "Version {} of ZarManager has been released!\n\nDo you want to open the browser to download it now?",
 
         # Floating tooltips
         "tip_auto": "Full cycle: Extracts the original ISO and immediately compresses it to .zar format.",
