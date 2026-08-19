@@ -18,7 +18,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.11"
+APP_VERSION = "v1.0.12"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -163,20 +163,24 @@ class ZarManagerGUI(ctk.CTk):
         self.destroy()
         os._exit(0) 
 
+    # ==========================================
+    # CORREÇÃO DEFINITIVA DO NAVEGADOR
+    # ==========================================
     def open_browser(self, url):
-        """Abre links no navegador padrão"""
-        try:
-            if platform.system() == "Linux":
-                ret = subprocess.call(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if ret != 0:
-                    webbrowser.open_new(url)
-            else:
-                webbrowser.open_new(url)
-        except Exception:
+        """Dispara a abertura do link em uma thread isolada para nunca travar a interface"""
+        def _open():
             try:
-                webbrowser.open_new(url)
+                if platform.system() == "Linux":
+                    subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    webbrowser.open_new(url)
             except Exception:
-                self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
+                try:
+                    webbrowser.open_new(url)
+                except Exception:
+                    self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
+                    
+        threading.Thread(target=_open, daemon=True).start()
 
     def get_text(self, key: str) -> str:
         return locales.get_text(self.cfg.get("language"), key)
@@ -263,16 +267,12 @@ class ZarManagerGUI(ctk.CTk):
             self.log_message("[ERRO] Nenhum arquivo foi selecionado para processamento.")
             return
 
-        # ==========================================
-        # VERIFICAÇÃO INTELIGENTE DE CONFLITOS (NOVO)
-        # ==========================================
         target_path = Path(target)
         collisions = []
         for path_str in selected_items:
             item_path = Path(path_str)
             item_name = item_path.stem if item_path.is_file() else item_path.name
             
-            # Prever o nome do arquivo final com base no modo
             if mode in ["auto", "compress"]:
                 target_item = target_path / f"{item_name}.zar"
             else:
@@ -287,19 +287,18 @@ class ZarManagerGUI(ctk.CTk):
                 message=self.get_text("msg_collision_desc")
             )
             
-            if resposta is None: # Cancelar
+            if resposta is None: 
                 self.log_message("[AVISO] Operação abortada pelo usuário (Conflito de arquivos).")
                 return
-            elif resposta is False: # Não (Pular existentes)
+            elif resposta is False: 
                 selected_items = [item for item in selected_items if item not in collisions]
                 self.log_message(f"[AVISO] {len(collisions)} item(ns) pulado(s) para preservar originais.")
                 
                 if not selected_items:
                     self.log_message("[AVISO] " + self.get_text("msg_queue_empty"))
                     return
-            else: # Sim (Sobrescrever)
+            else: 
                 self.log_message("[AVISO] Permissão concedida para sobrescrever itens existentes.")
-        # ==========================================
 
         self.tab_data[mode]["btns"]["start"].configure(state="disabled")
         self.tab_data[mode]["btns"]["pause"].configure(state="normal", text="Pausar Fila")
@@ -586,7 +585,6 @@ class ZarManagerGUI(ctk.CTk):
         tutorial_frame.pack(fill="x", padx=30, pady=10)
         ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
         
-        # OTIMIZAÇÃO: Lambda fixo sem dependência externa mutável
         btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.open_browser(GITHUB_REPO_URL))
         btn_github.pack(anchor="w", padx=30, pady=20)
         
