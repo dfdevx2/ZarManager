@@ -18,7 +18,7 @@ import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.8"
+APP_VERSION = "v1.0.10"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -90,19 +90,25 @@ class ZarManagerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
+        # OTIMIZAÇÃO LINUX: Força a escala global em 20% para corrigir interfaces minúsculas
+        if platform.system() == "Linux":
+            ctk.set_window_scaling(1.2)
+            ctk.set_widget_scaling(1.2)
+            
         self.cfg = ConfigManager()
         self.title(f"ZarManager {APP_VERSION}")
-        self.minsize(900, 600)
+        
+        # Aumentamos o tamanho base para garantir conforto
+        self.geometry("1150x750")
+        self.minsize(950, 650)
         
         try:
             saved_geometry = self.cfg.get("window_geometry")
             if saved_geometry:
                 self.geometry(saved_geometry)
             else:
-                self.geometry("1050x700")
                 self.after(10, self._center_window)
         except Exception:
-            self.geometry("1050x700")
             self.after(10, self._center_window)
             
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -160,17 +166,17 @@ class ZarManagerGUI(ctk.CTk):
         os._exit(0) 
 
     # ==========================================
-    # CORREÇÃO PARA ABRIR NAVEGADOR NO LINUX
+    # CORREÇÃO PARA ABRIR NAVEGADOR
     # ==========================================
     def open_browser(self, url):
-        """Força o uso do comando nativo no Linux para evitar falhas do PyInstaller"""
-        if platform.system() == "Linux":
-            try:
-                subprocess.Popen(['xdg-open', url])
-            except Exception:
-                webbrowser.open(url)
-        else:
-            webbrowser.open(url)
+        """Abre links no navegador padrão, lidando com peculiaridades do Linux"""
+        try:
+            if platform.system() == "Linux":
+                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                webbrowser.open_new(url)
+        except Exception as e:
+            self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
 
     def get_text(self, key: str) -> str:
         return locales.get_text(self.cfg.get("language"), key)
@@ -542,8 +548,8 @@ class ZarManagerGUI(ctk.CTk):
         tutorial_frame.pack(fill="x", padx=30, pady=10)
         ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
         
-        # MUDANÇA: Usa a nova função open_browser para compatibilidade com o Linux
-        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.open_browser(GITHUB_REPO_URL))
+        # CORREÇÃO LAMBDA: Passando variavel explicitamente para o Python não perder a referencia
+        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda u=GITHUB_REPO_URL: self.open_browser(u))
         btn_github.pack(anchor="w", padx=30, pady=20)
         
         self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
@@ -563,9 +569,7 @@ class ZarManagerGUI(ctk.CTk):
 
     def _check_for_updates_thread(self):
         try:
-            # CORREÇÃO PARA O LINUX: Ignora erro de verificação de SSL que o PyInstaller causa
             context = ssl._create_unverified_context()
-            
             req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
             with urllib.request.urlopen(req, timeout=7, context=context) as response:
                 data = json.loads(response.read().decode())
@@ -585,8 +589,9 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_found(self, msg, url):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="green")
-        # MUDANÇA: Usa a nova função open_browser
-        self.btn_download_update.configure(command=lambda: self.open_browser(url))
+        
+        # CORREÇÃO LAMBDA DE DOWNLOAD
+        self.btn_download_update.configure(command=lambda u=url: self.open_browser(u))
         self.btn_download_update.pack(anchor="w", padx=30, pady=(5, 10))
         self.log_message(f"[SISTEMA] Atualização detectada: {msg}")
 
