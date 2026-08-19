@@ -12,13 +12,13 @@ import platform
 import ssl
 import subprocess
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
 # Controle de Versão Interna
-APP_VERSION = "v1.0.10"
+APP_VERSION = "v1.0.11"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -90,7 +90,6 @@ class ZarManagerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        # OTIMIZAÇÃO LINUX: Força a escala global em 20% para corrigir interfaces minúsculas
         if platform.system() == "Linux":
             ctk.set_window_scaling(1.2)
             ctk.set_widget_scaling(1.2)
@@ -98,7 +97,6 @@ class ZarManagerGUI(ctk.CTk):
         self.cfg = ConfigManager()
         self.title(f"ZarManager {APP_VERSION}")
         
-        # Aumentamos o tamanho base para garantir conforto
         self.geometry("1150x750")
         self.minsize(950, 650)
         
@@ -165,18 +163,20 @@ class ZarManagerGUI(ctk.CTk):
         self.destroy()
         os._exit(0) 
 
-    # ==========================================
-    # CORREÇÃO PARA ABRIR NAVEGADOR
-    # ==========================================
     def open_browser(self, url):
-        """Abre links no navegador padrão, lidando com peculiaridades do Linux"""
+        """Abre links no navegador padrão"""
         try:
             if platform.system() == "Linux":
-                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                ret = subprocess.call(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if ret != 0:
+                    webbrowser.open_new(url)
             else:
                 webbrowser.open_new(url)
-        except Exception as e:
-            self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
+        except Exception:
+            try:
+                webbrowser.open_new(url)
+            except Exception:
+                self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
 
     def get_text(self, key: str) -> str:
         return locales.get_text(self.cfg.get("language"), key)
@@ -262,6 +262,44 @@ class ZarManagerGUI(ctk.CTk):
         if not selected_items:
             self.log_message("[ERRO] Nenhum arquivo foi selecionado para processamento.")
             return
+
+        # ==========================================
+        # VERIFICAÇÃO INTELIGENTE DE CONFLITOS (NOVO)
+        # ==========================================
+        target_path = Path(target)
+        collisions = []
+        for path_str in selected_items:
+            item_path = Path(path_str)
+            item_name = item_path.stem if item_path.is_file() else item_path.name
+            
+            # Prever o nome do arquivo final com base no modo
+            if mode in ["auto", "compress"]:
+                target_item = target_path / f"{item_name}.zar"
+            else:
+                target_item = target_path / item_name
+                
+            if target_item.exists():
+                collisions.append(path_str)
+
+        if collisions:
+            resposta = messagebox.askyesnocancel(
+                title=self.get_text("msg_collision_title"),
+                message=self.get_text("msg_collision_desc")
+            )
+            
+            if resposta is None: # Cancelar
+                self.log_message("[AVISO] Operação abortada pelo usuário (Conflito de arquivos).")
+                return
+            elif resposta is False: # Não (Pular existentes)
+                selected_items = [item for item in selected_items if item not in collisions]
+                self.log_message(f"[AVISO] {len(collisions)} item(ns) pulado(s) para preservar originais.")
+                
+                if not selected_items:
+                    self.log_message("[AVISO] " + self.get_text("msg_queue_empty"))
+                    return
+            else: # Sim (Sobrescrever)
+                self.log_message("[AVISO] Permissão concedida para sobrescrever itens existentes.")
+        # ==========================================
 
         self.tab_data[mode]["btns"]["start"].configure(state="disabled")
         self.tab_data[mode]["btns"]["pause"].configure(state="normal", text="Pausar Fila")
@@ -548,8 +586,8 @@ class ZarManagerGUI(ctk.CTk):
         tutorial_frame.pack(fill="x", padx=30, pady=10)
         ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
         
-        # CORREÇÃO LAMBDA: Passando variavel explicitamente para o Python não perder a referencia
-        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda u=GITHUB_REPO_URL: self.open_browser(u))
+        # OTIMIZAÇÃO: Lambda fixo sem dependência externa mutável
+        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.open_browser(GITHUB_REPO_URL))
         btn_github.pack(anchor="w", padx=30, pady=20)
         
         self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
@@ -589,9 +627,7 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_found(self, msg, url):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="green")
-        
-        # CORREÇÃO LAMBDA DE DOWNLOAD
-        self.btn_download_update.configure(command=lambda u=url: self.open_browser(u))
+        self.btn_download_update.configure(command=lambda: self.open_browser(url))
         self.btn_download_update.pack(anchor="w", padx=30, pady=(5, 10))
         self.log_message(f"[SISTEMA] Atualização detectada: {msg}")
 

@@ -25,6 +25,11 @@ TRANSLATIONS = {
         "msg_update_latest": "O sistema está atualizado (Versão {}).",
         "msg_update_error": "Falha na comunicação com o servidor.",
         
+        # Caixa de Conflitos
+        "msg_collision_title": "Conflito de Arquivos",
+        "msg_collision_desc": "Alguns itens selecionados já existem no diretório de destino.\n\n• Sim: Sobrescrever todos os existentes.\n• Não: Pular os existentes e processar apenas os novos.\n• Cancelar: Abortar a operação.",
+        "msg_queue_empty": "Todos os itens conflitantes foram pulados. A fila está vazia.",
+
         # Dicas flutuantes (Tooltips)
         "tip_auto": "Ciclo completo: Extrai a ISO original e compacta imediatamente para o formato .zar.",
         "tip_extract": "Ferramenta isolada: Apenas extrai os arquivos da ISO para uma pasta.",
@@ -59,6 +64,11 @@ TRANSLATIONS = {
         "msg_update_latest": "System is up to date (Version {}).",
         "msg_update_error": "Failed to communicate with the server.",
         
+        # Conflict Box
+        "msg_collision_title": "File Collision",
+        "msg_collision_desc": "Some selected items already exist in the target directory.\n\n• Yes: Overwrite all existing files.\n• No: Skip existing files and process only new ones.\n• Cancel: Abort the operation.",
+        "msg_queue_empty": "All conflicting items were skipped. The queue is empty.",
+
         # Floating tooltips
         "tip_auto": "Full cycle: Extracts the original ISO and immediately compresses it to .zar format.",
         "tip_extract": "Isolated tool: Only extracts files from the ISO into a folder.",
