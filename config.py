@@ -1,48 +1,60 @@
-# config.py
-# Gerenciamento de persistência de dados do usuário
-
+import os
 import json
+import sys
 from pathlib import Path
 
-CONFIG_FILE = Path(__file__).parent.resolve() / "settings.json"
-
-DEFAULT_CONFIG = {
-    "source_dir": "",
-    "target_dir": "",
-    "workers": 2,
-    "language": "pt-br",
-    "theme": "Sistema" # Modificado para ler o ambiente do SO nativamente
-}
-
 class ConfigManager:
-    def __init__(self):
+    def __init__(self, filename="settings.json"):
+        # CORREÇÃO CRÍTICA DO APPIMAGE: Se o programa estiver compilado (PyInstaller),
+        # redireciona o caminho de escrita para a pasta segura do utilizador no sistema.
+        if getattr(sys, 'frozen', False):
+            if os.name == 'nt':  # Windows Portable
+                base_path = Path(os.getenv('APPDATA')) / "ZarManager"
+            else:  # Linux (AppImage / Binário)
+                base_path = Path.home() / ".config" / "zarmanager"
+        else:  # Modo de desenvolvimento (VS Code)
+            base_path = Path(__file__).parent.resolve()
+
+        base_path.mkdir(parents=True, exist_ok=True)
+        self.config_file = base_path / filename
+        
+        self.default_config = {
+            "source_dir": "",
+            "target_dir": "",
+            "workers": 4,
+            "language": "pt-br",
+            "theme": "Sistema",
+            "auto_update": True,
+            "window_geometry": ""
+        }
         self.config = self.load_config()
 
-    def load_config(self) -> dict:
-        if not CONFIG_FILE.exists():
-            self.save_config(DEFAULT_CONFIG)
-            return DEFAULT_CONFIG
-            
+    def load_config(self):
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    # Garante que chaves novas apareçam mesmo em configs antigos
+                    for k, v in self.default_config.items():
+                        if k not in data:
+                            data[k] = v
+                    return data
+            except Exception:
+                pass
+        return self.default_config.copy()
+
+    def save_config(self):
         try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for key, value in DEFAULT_CONFIG.items():
-                    if key not in data:
-                        data[key] = value
-                return data
+            # Cria a pasta de destino caso não exista antes de salvar
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[AVISO] Falha ao ler configurações, restaurando padrões. Erro: {e}")
-            return DEFAULT_CONFIG
+            print(f"[ERRO DE CONFIGURAÇÃO] Não foi possível salvar o arquivo: {e}")
 
-    def save_config(self, new_config: dict = None):
-        if new_config:
-            self.config = new_config
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=4)
+    def get(self, key):
+        return self.config.get(key, self.default_config.get(key))
 
-    def get(self, key: str):
-        return self.config.get(key, DEFAULT_CONFIG.get(key))
-
-    def set(self, key: str, value):
+    def set(self, key, value):
         self.config[key] = value
         self.save_config()
