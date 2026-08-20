@@ -25,7 +25,7 @@ jobs:
       - name: Build Executable
         run: pyinstaller ZarManager.spec
       - name: Create Zip Archive
-        run: Compress-Archive -Path dist\ZarManager\* -DestinationPath ZarManager-Windows.zip
+        run: python -c "import shutil; shutil.make_archive('ZarManager-Windows', 'zip', 'dist/ZarManager')"
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -33,7 +33,7 @@ jobs:
           path: ZarManager-Windows.zip
 
   build-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -53,12 +53,14 @@ jobs:
           pip install pyinstaller
       - name: Build Executable
         run: pyinstaller ZarManager.spec
+      - name: Create Linux Standard Zip
+        run: python -c "import shutil; shutil.make_archive('ZarManager-Linux', 'zip', 'dist/ZarManager')"
       - name: Prepare AppImage Directory
         run: |
           mkdir -p AppDir/usr/bin
           cp -r dist/ZarManager/* AppDir/usr/bin/
+          chmod +x AppDir/usr/bin/ZarManager
           
-          # Cria o atalho Desktop nativo do Linux
           cat <<EOF > AppDir/ZarManager.desktop
           [Desktop Entry]
           Type=Application
@@ -66,32 +68,33 @@ jobs:
           Exec=ZarManager
           Icon=ZarManager
           Categories=Utility;
+          Terminal=false
           EOF
           
-          # Lógica à prova de balas para o ícone
           if [ -f img/icon.ico ]; then
             cp img/icon.ico AppDir/ZarManager.png
           else
             touch AppDir/ZarManager.png
           fi
           
-          # Cria o AppRun seguro
           cat <<'EOF' > AppDir/AppRun
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "${0}")")"
-          exec "$HERE/usr/bin/ZarManager" "$@"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/ZarManager" "$@"
           EOF
           chmod +x AppDir/AppRun
           
-          # Constrói o AppImage (AQUI ESTAVA O ERRO DE DIGITAÇÃO)
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
           ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ZarManager-Linux-x86_64.AppImage
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Linux-Build
-          path: ZarManager-Linux-x86_64.AppImage
+          path: |
+            ZarManager-Linux.zip
+            ZarManager-Linux-x86_64.AppImage
 
   create-release:
     needs: [build-windows, build-linux]
@@ -106,6 +109,7 @@ jobs:
           body_path: CHANGELOG.md
           files: |
             Windows-Build/ZarManager-Windows.zip
+            Linux-Build/ZarManager-Linux.zip
             Linux-Build/ZarManager-Linux-x86_64.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
