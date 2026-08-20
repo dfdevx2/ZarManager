@@ -5,6 +5,14 @@ on:
     tags:
       - 'v*'
 
+# ADICIONE ESTE BLOCO AQUI PARA BLINDAR A PERMISSÃO
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
 jobs:
   build-windows:
     runs-on: windows-latest
