@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*'
 
-# PERMISSÃO DE ESCRITA ADICIONADA AQUI (Resolve o erro 403)
 permissions:
   contents: write
 
@@ -84,6 +83,29 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          # Constrói o AppImage
+          # Constrói o AppImage (AQUI ESTAVA O ERRO DE DIGITAÇÃO)
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.
+          chmod +x appimagetool-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ZarManager-Linux-x86_64.AppImage
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-Build
+          path: ZarManager-Linux-x86_64.AppImage
+
+  create-release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          files: |
+            Windows-Build/ZarManager-Windows.zip
+            Linux-Build/ZarManager-Linux-x86_64.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
