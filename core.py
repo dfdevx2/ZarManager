@@ -1,219 +1,189 @@
-import os
-import shutil
-import subprocess
 import sys
-import time
+import subprocess
 import threading
 import platform
+import shutil
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-# Identifica o sistema operacional para alternar os binários corretamente (.exe no Windows)
-IS_WINDOWS = platform.system() == "Windows"
-BIN_EXTENSION = ".exe" if IS_WINDOWS else ""
-
-if getattr(sys, 'frozen', False):
-    BASE_DIR = Path(sys._MEIPASS)
-else:
-    BASE_DIR = Path(__file__).parent.resolve()
-
-BIN_DIR = BASE_DIR / "bin"
-ZARCHIVE_BIN = BIN_DIR / f"zarchive{BIN_EXTENSION}"
-EXTRACT_XISO_BIN = BIN_DIR / f"extract-xiso{BIN_EXTENSION}"
+from concurrent.futures import ThreadPoolExecutor
 
 class ZarManagerCore:
-    def __init__(self, selected_items: list, target_directory: str, max_workers: int = 1, mode: str = "auto", 
-                 log_callback=None, progress_callback=None, status_callback=None):
-        self.queue = [Path(p) for p in selected_items]
-        self.target_directory = Path(target_directory)
+    def __init__(self, selected_items, target_directory, max_workers, mode, log_callback, progress_callback, status_callback):
+        self.items = [Path(p) for p in selected_items]
+        self.target_dir = Path(target_directory)
         self.max_workers = max_workers
-        self.mode = mode 
+        self.mode = mode
+        self.log = log_callback
+        self.progress_cb = progress_callback
+        self.status_cb = status_callback
         
-        self.log_cb = log_callback if log_callback else print
-        self.progress_callback = progress_callback if progress_callback else lambda c, t, r: None
-        self.status_cb = status_callback if status_callback else lambda n, s: None
+        self.cancel_flag = threading.Event()
+        self.pause_flag = threading.Event()
+        self.pause_flag.set() 
         
-        self.total_tasks = len(self.queue)
-        self.item_progress = {str(item): 0.0 for item in self.queue}
+        self.completed_tasks = 0
+        self.total_tasks = len(self.items)
         
-        self.cancel_flag = False
-        self.pause_event = threading.Event()
-        self.pause_event.set() 
-        self.active_processes = []
-        self.process_lock = threading.Lock()
-        self.progress_lock = threading.Lock()
-
-    def log(self, message: str):
-        self.log_cb(message)
-
-    def update_status(self, item_name: str, status: str):
-        self.status_cb(item_name, status)
-
-    def update_progress(self, item_path: str, value: float):
-        with self.progress_lock:
-            self.item_progress[item_path] = value
-            total_sum = sum(self.item_progress.values())
-            overall_ratio = total_sum / self.total_tasks if self.total_tasks > 0 else 0.0
-            completed_count = sum(1 for v in self.item_progress.values() if v >= 1.0)
-            self.progress_callback(completed_count, self.total_tasks, overall_ratio)
+        if getattr(sys, 'frozen', False):
+            self.base_dir = Path(sys._MEIPASS)
+        else:
+            self.base_dir = Path(__file__).parent.resolve()
+            
+        self.bin_dir = self.base_dir / "bin"
+        sys_os = platform.system()
+        
+        if sys_os == "Windows":
+            self.xiso_bin = self.bin_dir / "extract-xiso.exe"
+            self.zar_bin = self.bin_dir / "zarchive.exe"
+            self.bin_7z = self.bin_dir / "7z.exe" 
+        else:
+            self.xiso_bin = self.bin_dir / "extract-xiso"
+            self.zar_bin = self.bin_dir / "zarchive"
+            self.bin_7z = self.bin_dir / "7z" 
+            
+            if not self.bin_7z.exists() and shutil.which("7z"):
+                self.bin_7z = Path(shutil.which("7z"))
 
     def verify_environment(self) -> bool:
-        if self.mode in ["auto", "compress"] and (not ZARCHIVE_BIN.exists() or not os.access(ZARCHIVE_BIN, os.X_OK) if not IS_WINDOWS else not ZARCHIVE_BIN.exists()):
-            self.log(f"[ERRO CRÍTICO] Motor ZArchive ausente em: {ZARCHIVE_BIN}")
-            return False
+        missing = []
+        if self.mode in ['auto', 'extract'] and not self.xiso_bin.exists():
+            missing.append("extract-xiso")
+        if self.mode in ['auto', 'compress'] and not self.zar_bin.exists():
+            missing.append("zarchive")
             
-        if self.mode in ["auto", "extract"] and (not EXTRACT_XISO_BIN.exists() or not os.access(EXTRACT_XISO_BIN, os.X_OK) if not IS_WINDOWS else not EXTRACT_XISO_BIN.exists()):
-            self.log(f"[ERRO CRÍTICO] Extractor extract-xiso ausente em: {EXTRACT_XISO_BIN}")
+        has_archives = any(p.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz'] for p in self.items)
+        if (self.mode == 'extract_arc' or has_archives) and not self.bin_7z.exists():
+            missing.append("7-Zip (7z / 7z.exe)")
+
+        if missing:
+            self.log(f"[ERRO AMBIENTAL] Binários ausentes: {', '.join(missing)}")
             return False
-            
-        self.target_directory.mkdir(parents=True, exist_ok=True)
         return True
 
-    def request_cancel(self):
-        self.cancel_flag = True
-        self.pause_event.set() 
-        with self.process_lock:
-            for proc in self.active_processes:
-                try: proc.kill()
-                except Exception: pass
-        self.log("[SISTEMA] Sinal de cancelamento recebido. Abortando processos ativos...")
-
     def toggle_pause(self) -> bool:
-        if self.pause_event.is_set():
-            self.pause_event.clear()
-            self.log("[SISTEMA] Fila pausada. As tarefas ativas terminarão com segurança.")
+        if self.pause_flag.is_set():
+            self.pause_flag.clear()
+            self.log("[SISTEMA] Processamento em pausa.")
             return True
         else:
-            self.pause_event.set()
-            self.log("[SISTEMA] Fila retomada.")
+            self.pause_flag.set()
+            self.log("[SISTEMA] Processamento retomado.")
             return False
 
-    def _run_subprocess_live(self, cmd: list, item_name: str):
-        """Executa o binário capturando a saída em tempo real para alimentar o log."""
-        
-        # Oculta a janela preta do CMD no Windows
-        startupinfo = None
-        if IS_WINDOWS:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, startupinfo=startupinfo)
-        with self.process_lock:
-            self.active_processes.append(proc)
-        
-        # Conta as linhas para simular o progresso (como o extract-xiso/zarchive não dão %)
-        linhas_lidas = 0
-        estimativa_linhas = 5000 
-        
-        for line in iter(proc.stdout.readline, ''):
-            if self.cancel_flag:
-                break
-            line_str = line.strip()
-            if line_str:
-                linhas_lidas += 1
-                if linhas_lidas % 50 == 0:
-                    self.log(f"[{item_name}] {line_str[:60]}...")
-                    # Calcula o progresso simulado (até 95% da etapa)
-                    progresso_simulado = min(linhas_lidas / estimativa_linhas, 0.95)
-                    # Como não sabemos a etapa exata aqui, vamos focar no log por enquanto. 
-                    # Uma implementação mais avançada passaria os limites de progresso como argumento.
-                
-        proc.stdout.close()
-        return_code = proc.wait()
-        
-        with self.process_lock:
-            if proc in self.active_processes:
-                self.active_processes.remove(proc)
-                
-        if self.cancel_flag:
-            raise InterruptedError("Processo cancelado pelo usuário.")
-            
-        if return_code != 0:
-            raise subprocess.CalledProcessError(return_code, cmd)
-
-    def process_item(self, item_path: Path) -> str:
-        self.pause_event.wait() 
-        if self.cancel_flag:
-            return f"[AVISO] '{item_path.name}' ignorado."
-
-        path_str = str(item_path)
-        item_name = item_path.stem if item_path.is_file() else item_path.name
-        start_time = time.time()
-        
-        try:
-            self.update_progress(path_str, 0.05)
-
-            if self.mode == "auto":
-                extracted_folder = item_path.parent / f"_extracted_{item_name}"
-                target_file = self.target_directory / f"{item_name}.zar"
-                if extracted_folder.exists(): shutil.rmtree(extracted_folder)
-                
-                self.update_status(item_name, "Extraindo (XDVDFS)...")
-                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(extracted_folder), str(item_path)], item_name)
-                
-                if self.cancel_flag: raise InterruptedError()
-                
-                self.update_progress(path_str, 0.5)
-                self.update_status(item_name, "Comprimindo (.zar)...")
-                self._run_subprocess_live([str(ZARCHIVE_BIN), str(extracted_folder), str(target_file)], item_name)
-                
-                self.update_progress(path_str, 0.9)
-                self.update_status(item_name, "Limpando resíduos...")
-                shutil.rmtree(extracted_folder)
-
-            elif self.mode == "extract":
-                target_folder = self.target_directory / item_name
-                if target_folder.exists(): shutil.rmtree(target_folder)
-                
-                self.update_status(item_name, "Descompactando...")
-                self.update_progress(path_str, 0.2)
-                self._run_subprocess_live([str(EXTRACT_XISO_BIN), "-x", "-d", str(target_folder), str(item_path)], item_name)
-
-            elif self.mode == "compress":
-                target_file = self.target_directory / f"{item_name}.zar"
-                self.update_status(item_name, "Comprimindo...")
-                self.update_progress(path_str, 0.2)
-                self._run_subprocess_live([str(ZARCHIVE_BIN), str(item_path), str(target_file)], item_name)
-                
-            elapsed_time = time.time() - start_time
-            self.update_progress(path_str, 1.0)
-            self.update_status(item_name, "CONCLUIDO")
-            return f"[SUCESSO] '{item_name}' concluído em {elapsed_time:.2f}s."
-            
-        except InterruptedError:
-            if self.mode == "auto" and 'extracted_folder' in locals() and extracted_folder.exists():
-                shutil.rmtree(extracted_folder, ignore_errors=True)
-            self.update_progress(path_str, 1.0)
-            self.update_status(item_name, "CANCELADO")
-            return f"[CANCELADO] '{item_name}' abortado."
-            
-        except subprocess.CalledProcessError:
-            if self.mode == "auto" and 'extracted_folder' in locals() and extracted_folder.exists():
-                shutil.rmtree(extracted_folder, ignore_errors=True)
-            self.update_progress(path_str, 1.0)
-            self.update_status(item_name, "FALHA")
-            return f"[ERRO] Falha estrutural em '{item_name}'."
-            
-        except Exception as e:
-            if self.mode == "auto" and 'extracted_folder' in locals() and extracted_folder.exists():
-                shutil.rmtree(extracted_folder, ignore_errors=True)
-            self.update_progress(path_str, 1.0)
-            self.update_status(item_name, "FALHA CRÍTICA")
-            return f"[ERRO CRÍTICO] Exceção em '{item_name}': {str(e)}"
+    def request_cancel(self):
+        self.cancel_flag.set()
+        self.pause_flag.set()
+        self.log("[SISTEMA] Abortando fila...")
 
     def start_processing(self):
-        if not self.queue:
-            self.log("[AVISO] Nenhuma tarefa na fila.")
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = [executor.submit(self._pipeline, item) for item in self.items]
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    self.log(f"[ERRO THREAD] Falha: {str(e)}")
+
+        if self.cancel_flag.is_set():
+            self.log("[SISTEMA] Lote abortado pelo usuário.")
+        else:
+            self.log("[SISTEMA] Lote concluído com sucesso.")
+
+    def _pipeline(self, item_path: Path):
+        if self.cancel_flag.is_set():
+            self.status_cb(item_path.name, "CANCELADO")
             return
 
-        self.log(f"[SISTEMA] Iniciando processamento de {self.total_tasks} itens.")
-        
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self.process_item, item): item for item in self.queue}
-            for future in as_completed(futures):
-                future.result()
+        self.pause_flag.wait()
+        original_name = item_path.name
+        current_path = item_path
+
+        try:
+            # ETAPA 1: 7-Zip (Extração Plana)
+            if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
+                self.status_cb(original_name, "DESCOMPACTANDO...")
                 
-        if self.cancel_flag:
-            self.log("[SISTEMA] Operação cancelada com sucesso.")
-        else:
-            self.log("[SISTEMA] Lote finalizado integralmente.")
+                # MUDANÇA AQUI: 'e' garante que não haverá pastas dentro de pastas
+                temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
+                cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
+                self._run_cmd(cmd)
+                
+                iso_files = list(temp_extract_dir.glob("*.iso"))
+                
+                if iso_files:
+                    target_file = self.target_dir / iso_files[0].name
+                    shutil.move(str(iso_files[0]), str(target_file))
+                    current_path = target_file
+                else:
+                    extracted_folder = self.target_dir / current_path.stem
+                    # Como foi extraído plano, movemos a pasta temp renomeada
+                    shutil.move(str(temp_extract_dir), str(extracted_folder))
+                    current_path = extracted_folder
+                
+                shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                
+                try: item_path.unlink() # Apaga RAR
+                except: pass
+                
+                if self.mode == 'extract_arc':
+                    self._finalize_item(original_name, "CONCLUIDO")
+                    return
+
+            # ETAPA 2: Extrair XISO
+            if self.mode in ['auto', 'extract'] and current_path.is_file() and current_path.suffix.lower() == '.iso':
+                self.status_cb(original_name, "EXTRAINDO ISO...")
+                
+                if current_path.parent != self.target_dir:
+                    new_iso_path = self.target_dir / current_path.name
+                    shutil.move(str(current_path), str(new_iso_path))
+                    current_path = new_iso_path
+                
+                cmd = [str(self.xiso_bin), "-x", str(current_path), "-d", str(self.target_dir)]
+                self._run_cmd(cmd)
+                
+                extracted_folder = self.target_dir / current_path.stem
+                try: current_path.unlink() 
+                except: pass
+                current_path = extracted_folder
+                
+                if self.mode == 'extract':
+                    self._finalize_item(original_name, "CONCLUIDO")
+                    return
+
+            # ETAPA 3: Comprimir para ZAR
+            if self.mode in ['auto', 'compress'] and current_path.is_dir():
+                self.status_cb(original_name, "COMPRIMINDO ZAR...")
+                zar_output = self.target_dir / f"{current_path.name}.zar"
+                
+                cmd = [str(self.zar_bin), str(zar_output), str(current_path)]
+                self._run_cmd(cmd)
+                
+                shutil.rmtree(current_path, ignore_errors=True)
+                
+            self._finalize_item(original_name, "CONCLUIDO")
+
+        except Exception as e:
+            self.log(f"[ERRO NO ARQUIVO] {original_name}: {str(e)}")
+            self._finalize_item(original_name, "FALHA")
+
+    def _run_cmd(self, cmd_list):
+        if self.cancel_flag.is_set():
+            raise Exception("Cancelado.")
+            
+        creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+        process = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags)
+        
+        while process.poll() is None:
+            if self.cancel_flag.is_set():
+                process.terminate()
+                raise Exception("Processo abortado.")
+            process.stdout.readline() 
+            
+        if process.returncode != 0 and not self.cancel_flag.is_set():
+            raise Exception(f"Falha com código {process.returncode}")
+
+    def _finalize_item(self, name, status):
+        self.status_cb(name, status)
+        with threading.Lock():
+            self.completed_tasks += 1
+            ratio = self.completed_tasks / self.total_tasks
+            self.progress_cb(self.completed_tasks, self.total_tasks, ratio)

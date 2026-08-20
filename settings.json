@@ -1,0 +1,9 @@
+{
+    "source_dir": "/run/media/dfdx047/Elements/Acervo de Emulacao/Nintendo/Nintendo Entertainment System",
+    "target_dir": "/run/media/dfdx047/Elements/Acervo de Emulacao",
+    "workers": 2,
+    "language": "pt-br",
+    "theme": "Preto",
+    "auto_update": true,
+    "window_geometry": "1450x1101+1840+199"
+}
