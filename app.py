@@ -2,6 +2,7 @@
 
 import sys
 import tkinter as tk
+from tkinter import ttk 
 import customtkinter as ctk
 import webbrowser
 import threading
@@ -17,14 +18,10 @@ from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
-# Controle de Versão Interna
-APP_VERSION = "v1.0.13"
+APP_VERSION = "v1.2.5"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
-# ==========================================
-# MOTOR DE DICAS FLUTUANTES (TOOLTIPS)
-# ==========================================
 class ToolTip:
     def __init__(self, widget, text_callback):
         self.widget = widget
@@ -70,18 +67,17 @@ class ToolTip:
             label.pack(ipadx=1)
             
     def hide(self):
-        tw = self.tooltip_window
-        self.tooltip_window = None
-        if tw:
-            tw.destroy()
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
 
 # ==========================================
-# CONFIGURAÇÃO DE TEMAS E JANELA PRINCIPAL
+# NOVO TEMA: AMOLED ROXO
 # ==========================================
 THEME_COLORS = {
     "Sistema": {"mode": "System", "sidebar": ("gray85", "gray17"), "accent": ("#3B8ED0", "#1F6AA5"), "hover": ("#36719F", "#144870"), "text": ("black", "white")},
     "Branco": {"mode": "Light", "sidebar": ("#EBEBEB", "#EBEBEB"), "accent": ("#3B8ED0", "#3B8ED0"), "hover": ("#36719F", "#36719F"), "text": "black"},
-    "Preto": {"mode": "Dark", "sidebar": ("gray13", "gray13"), "accent": ("#1F6AA5", "#1F6AA5"), "hover": ("#144870", "#144870"), "text": "white"},
+    "Preto": {"mode": "Dark", "sidebar": ("#000000", "#050505"), "accent": ("#8A2BE2", "#6A0DAD"), "hover": ("#9932CC", "#4B0082"), "text": "white"},
     "Steam": {"mode": "Dark", "sidebar": ("#171a21", "#171a21"), "accent": ("#2a475e", "#2a475e"), "hover": ("#66c0f4", "#66c0f4"), "text": "white"},
     "Xbox": {"mode": "Dark", "sidebar": ("#121e13", "#121e13"), "accent": ("#107C10", "#107C10"), "hover": ("#0B580B", "#0B580B"), "text": "white"}
 }
@@ -91,122 +87,110 @@ class ZarManagerGUI(ctk.CTk):
         super().__init__()
         
         if platform.system() == "Linux":
-            ctk.set_window_scaling(1.2)
-            ctk.set_widget_scaling(1.2)
+            ctk.set_window_scaling(1.1)
+            ctk.set_widget_scaling(1.1)
             
         self.cfg = ConfigManager()
         self.title(f"ZarManager {APP_VERSION}")
         
-        self.geometry("1150x750")
         self.minsize(950, 650)
-        
-        try:
-            saved_geometry = self.cfg.get("window_geometry")
-            if saved_geometry:
-                self.geometry(saved_geometry)
-            else:
-                self.after(10, self._center_window)
-        except Exception:
-            self.after(10, self._center_window)
-            
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        # ------------------------------------------
-        # INJEÇÃO DO ÍCONE DA JANELA (APENAS WINDOWS)
-        # ------------------------------------------
         try:
-            if getattr(sys, 'frozen', False):
-                base_path = Path(sys._MEIPASS)
-            else:
-                base_path = Path(__file__).parent.resolve()
-            
-            if platform.system() == "Windows":
-                icon_path = base_path / "img" / "icon.ico"
-                if icon_path.exists():
-                    self.iconbitmap(str(icon_path))
-        except Exception:
-            pass
-        # ------------------------------------------
+            base_path = Path(sys._MEIPASS) if getattr(sys, 'frozen', False) else Path(__file__).parent.resolve()
+            if platform.system() == "Windows" and (base_path / "img" / "icon.ico").exists():
+                self.iconbitmap(str(base_path / "img" / "icon.ico"))
+        except Exception: pass
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         
         self.tab_data = {
-            "auto": {"checkboxes": {}, "scroll_frame": None, "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}},
-            "extract": {"checkboxes": {}, "scroll_frame": None, "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}},
-            "compress": {"checkboxes": {}, "scroll_frame": None, "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}}
+            "auto": {"treeview": None, "items": [], "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}},
+            "extract_arc": {"treeview": None, "items": [], "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}},
+            "extract": {"treeview": None, "items": [], "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}},
+            "compress": {"treeview": None, "items": [], "lbl_counter": None, "lbl_percentage": None, "progress": None, "tasks_frame": None, "active_tasks": {}, "core_instance": None, "btns": {}}
         }
         
         self.current_frame_name = "auto"
         self.build_all()
 
-        # Inicia a verificação silenciosa de atualização (Delay de 2 segundos para não pesar o startup)
+        saved_geometry = self.cfg.get("window_geometry")
+        if saved_geometry:
+            self.geometry(saved_geometry)
+        else:
+            w, h = 1200, 800
+            x = (self.winfo_screenwidth() // 2) - (w // 2)
+            y = (self.winfo_screenheight() // 2) - (h // 2)
+            self.geometry(f"{w}x{h}+{x}+{y}")
+            
+        self.after(200, self._force_render_refresh)
         self.after(2000, self.check_for_updates_silently)
 
-    def _center_window(self):
-        self.update_idletasks()
-        largura = self.winfo_width()
-        altura = self.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (largura // 2)
-        y = (self.winfo_screenheight() // 2) - (altura // 2)
-        self.geometry(f"+{x}+{y}")
+    def _force_render_refresh(self):
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w > 100 and h > 100:
+            self.geometry(f"{w}x{h+1}")
+            self.update_idletasks()
+            self.after(50, lambda: self.geometry(f"{w}x{h}"))
+        else:
+            self.after(100, self._force_render_refresh)
 
     def on_closing(self):
-        try:
-            self.cfg.set("window_geometry", self.geometry())
-        except Exception:
-            pass
-
-        for mode in ["auto", "extract", "compress"]:
-            core = self.tab_data[mode].get("core_instance")
-            if core:
-                try: core.request_cancel()
+        try: self.cfg.set("window_geometry", self.geometry())
+        except Exception: pass
+        for mode in ["auto", "extract_arc", "extract", "compress"]:
+            if self.tab_data[mode].get("core_instance"):
+                try: self.tab_data[mode]["core_instance"].request_cancel()
                 except Exception: pass
-
         self.destroy()
         os._exit(0) 
 
-    # ==========================================
-    # GATILHO SONORO (CROSS-PLATFORM)
-    # ==========================================
     def play_sound(self, sound_type="success"):
-        """Toca efeito sonoro em uma thread separada para evitar congelamento visual"""
         def _play():
             try:
                 if platform.system() == "Windows":
                     import winsound
-                    if sound_type == "success":
-                        winsound.MessageBeep(winsound.MB_OK)
-                    elif sound_type == "error":
-                        winsound.MessageBeep(winsound.MB_ICONHAND)
-                else:
-                    self.bell() # Fallback seguro no Linux
-            except Exception:
-                pass
+                    winsound.MessageBeep(winsound.MB_OK if sound_type == "success" else winsound.MB_ICONHAND)
+                else: self.bell() 
+            except Exception: pass
         threading.Thread(target=_play, daemon=True).start()
 
     def open_browser(self, url):
         def _open():
             try:
-                if platform.system() == "Linux":
-                    subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                else:
-                    webbrowser.open_new(url)
+                if platform.system() == "Linux": subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else: webbrowser.open_new(url)
             except Exception:
-                try:
-                    webbrowser.open_new(url)
-                except Exception:
-                    self.log_message(f"[ERRO] Falha ao abrir link. Copie manualmente: {url}")
+                try: webbrowser.open_new(url)
+                except: self.log_message(f"[ERRO] Copie manualmente: {url}")
         threading.Thread(target=_open, daemon=True).start()
 
-    def get_text(self, key: str) -> str:
-        return locales.get_text(self.cfg.get("language"), key)
+    def get_text(self, key: str): return locales.get_text(self.cfg.get("language"), key)
 
     def apply_appearance(self):
         theme_name = self.cfg.get("theme")
-        if theme_name not in THEME_COLORS: theme_name = "Sistema"
-        self.theme_data = THEME_COLORS[theme_name]
+        self.theme_data = THEME_COLORS.get(theme_name, THEME_COLORS["Sistema"])
         ctk.set_appearance_mode(self.theme_data["mode"])
+        
+        # Ajuste de fundo se for o tema AMOLED
+        bg_col = "#000000" if theme_name == "Preto" else ("#1a1a1a" if ctk.get_appearance_mode() == "Dark" else "#fcfcfc")
+        fg_col = "white" if ctk.get_appearance_mode() == "Dark" else "black"
+        
+        style = ttk.Style(self)
+        style.theme_use("default")
+        style.configure("Treeview", 
+                        background=bg_col, 
+                        foreground=fg_col, 
+                        fieldbackground=bg_col, 
+                        rowheight=35,
+                        borderwidth=0, 
+                        font=("Segoe UI", 12))
+        style.map("Treeview", 
+                  background=[("selected", self.theme_data["accent"][1])], 
+                  foreground=[("selected", "white")])
+        style.configure("Treeview.Heading", borderwidth=0)
 
     def build_all(self):
         self.apply_appearance()
@@ -217,238 +201,173 @@ class ZarManagerGUI(ctk.CTk):
         self.select_frame_by_name(self.current_frame_name)
         
         self.after(50, lambda: self.populate_file_list("auto", self.cfg.get("source_dir")))
-        self.after(100, lambda: self.populate_file_list("extract", self.cfg.get("source_dir")))
-        self.after(150, lambda: self.populate_file_list("compress", self.cfg.get("source_dir")))
+        self.after(100, lambda: self.populate_file_list("extract_arc", self.cfg.get("source_dir")))
+        self.after(150, lambda: self.populate_file_list("extract", self.cfg.get("source_dir")))
+        self.after(200, lambda: self.populate_file_list("compress", self.cfg.get("source_dir")))
 
     def refresh_ui(self):
         for widget in self.winfo_children(): widget.destroy()
         self.build_all()
 
     def select_folder(self, config_key: str, entry_widget: ctk.CTkEntry, mode_tab: str = None):
-        current_path = self.cfg.get(config_key)
-        selected_dir = filedialog.askdirectory(initialdir=current_path if current_path else "/")
-        
-        if selected_dir:
-            self.cfg.set(config_key, selected_dir)
+        folder = filedialog.askdirectory(initialdir=self.cfg.get(config_key) or "/")
+        if folder:
+            self.cfg.set(config_key, folder)
             entry_widget.delete(0, "end")
-            entry_widget.insert(0, selected_dir)
-            self.log_message(f"[SISTEMA] {config_key} atualizado para: {selected_dir}")
-            
+            entry_widget.insert(0, folder)
+            self.log_message(f"[SISTEMA] {config_key} atualizado: {folder}")
             if config_key == "source_dir" and mode_tab:
-                self.populate_file_list("auto", selected_dir)
-                self.populate_file_list("extract", selected_dir)
-                self.populate_file_list("compress", selected_dir)
+                self.populate_file_list(mode_tab, folder)
 
     def populate_file_list(self, mode: str, directory: str):
-        scroll_frame = self.tab_data[mode]["scroll_frame"]
-        if not scroll_frame or not directory or not os.path.exists(directory): return
+        tv = self.tab_data[mode]["treeview"]
+        if not tv or not directory or not os.path.exists(directory): return
             
-        for widget in scroll_frame.winfo_children(): widget.destroy()
-        self.tab_data[mode]["checkboxes"].clear()
+        tv.delete(*tv.get_children())
+        self.tab_data[mode]["items"].clear()
         
-        target_path = Path(directory)
-        items_found = []
-        
+        target = Path(directory)
+        items = []
         try:
-            if mode in ["auto", "extract"]: items_found = list(target_path.glob("*.iso"))
-            elif mode == "compress": items_found = [d for d in target_path.iterdir() if d.is_dir()]
+            if mode == "auto": 
+                for f in target.iterdir():
+                    if (f.is_file() and f.suffix.lower() in ('.iso', '.zip', '.rar', '.7z', '.tar', '.gz')) or f.is_dir(): items.append(f)
+            elif mode == "extract_arc":
+                for f in target.iterdir():
+                    if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z', '.tar', '.gz'): items.append(f)
+            elif mode == "extract":
+                items = list(target.glob("*.iso"))
+            elif mode == "compress": 
+                items = [d for d in target.iterdir() if d.is_dir()]
         except Exception: pass
 
-        if not items_found:
-            ctk.CTkLabel(scroll_frame, text="Nenhum item compatível encontrado na pasta.", text_color="gray").pack(pady=20)
+        items = sorted(items)
+        if not items:
+            tv.insert("", "end", text="   Nenhum arquivo compatível encontrado na pasta.")
             return
 
-        for item in sorted(items_found):
-            var = ctk.BooleanVar(value=True)
-            chk = ctk.CTkCheckBox(scroll_frame, text=item.name, variable=var, fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"])
-            chk.pack(anchor="w", padx=10, pady=5)
-            self.tab_data[mode]["checkboxes"][str(item)] = var
+        for item in items:
+            tv.insert("", "end", iid=str(item), text=f"   {item.name}")
+            self.tab_data[mode]["items"].append(item)
+            
+        tv.selection_set(tv.get_children())
 
     def toggle_all_selections(self, mode: str):
-        checkboxes = self.tab_data[mode]["checkboxes"].values()
-        if not checkboxes: return
-        all_checked = all(var.get() for var in checkboxes)
-        new_state = not all_checked
-        for var in checkboxes: var.set(new_state)
+        tv = self.tab_data[mode]["treeview"]
+        all_items = tv.get_children()
+        if not all_items: return
+        if len(tv.selection()) == len(all_items):
+            tv.selection_remove(all_items)
+        else:
+            tv.selection_add(all_items)
 
     def start_process(self, mode: str):
         target = self.cfg.get("target_dir")
-        workers = self.cfg.get("workers")
-        
-        if not target:
-            self.log_message("[ERRO] Diretório de destino ausente.")
-            return
+        if not target: return self.log_message("[ERRO] Diretório destino ausente.")
 
-        selected_items = [path for path, var in self.tab_data[mode]["checkboxes"].items() if var.get()]
-        if not selected_items:
-            self.log_message("[ERRO] Nenhum arquivo foi selecionado para processamento.")
-            return
+        selected_iids = self.tab_data[mode]["treeview"].selection()
+        if not selected_iids: return self.log_message("[ERRO] Selecione ao menos um item.")
+        
+        selected_items = list(selected_iids)
 
         target_path = Path(target)
         collisions = []
-        for path_str in selected_items:
-            item_path = Path(path_str)
-            item_name = item_path.stem if item_path.is_file() else item_path.name
-            
-            if mode in ["auto", "compress"]:
-                target_item = target_path / f"{item_name}.zar"
-            else:
-                target_item = target_path / item_name
-                
-            if target_item.exists():
-                collisions.append(path_str)
+        for p in selected_items:
+            path = Path(p)
+            name = path.stem if path.is_file() else path.name
+            out = target_path / f"{name}.zar" if mode in ["auto", "compress"] else target_path / name
+            if out.exists(): collisions.append(p)
 
         if collisions:
-            resposta = messagebox.askyesnocancel(
-                title=self.get_text("msg_collision_title"),
-                message=self.get_text("msg_collision_desc")
-            )
-            
-            if resposta is None: 
-                self.log_message("[AVISO] Operação abortada pelo usuário (Conflito de arquivos).")
-                return
-            elif resposta is False: 
-                selected_items = [item for item in selected_items if item not in collisions]
-                self.log_message(f"[AVISO] {len(collisions)} item(ns) pulado(s) para preservar originais.")
-                
-                if not selected_items:
-                    self.log_message("[AVISO] " + self.get_text("msg_queue_empty"))
-                    return
-            else: 
-                self.log_message("[AVISO] Permissão concedida para sobrescrever itens existentes.")
+            resp = messagebox.askyesnocancel(title=self.get_text("msg_collision_title"), message=self.get_text("msg_collision_desc"))
+            if resp is None: return self.log_message("[AVISO] Abortado (Conflito).")
+            elif resp is False: 
+                selected_items = [i for i in selected_items if i not in collisions]
+                if not selected_items: return self.log_message("[AVISO] Fila vazia após pular conflitos.")
+                self.log_message(f"[AVISO] Pulando {len(collisions)} itens.")
 
         self.tab_data[mode]["btns"]["start"].configure(state="disabled")
         self.tab_data[mode]["btns"]["pause"].configure(state="normal", text="Pausar Fila")
         self.tab_data[mode]["btns"]["cancel"].configure(state="normal")
-        
         self.tab_data[mode]["progress"].set(0)
         self.tab_data[mode]["lbl_percentage"].configure(text="0%")
-        self.tab_data[mode]["lbl_counter"].configure(text=f"0 / {len(selected_items)} itens concluídos")
-        self.log_message(f"[SISTEMA] Acionando lote ({mode.upper()}) com {len(selected_items)} itens alocados...")
+        self.log_message(f"[SISTEMA] Lote ({mode.upper()}) iniciado.")
         
-        process_thread = threading.Thread(target=self._run_core_logic, args=(selected_items, target, workers, mode), daemon=True)
-        process_thread.start()
+        threading.Thread(target=self._run_core_logic, args=(selected_items, target, self.cfg.get("workers"), mode), daemon=True).start()
 
-    def toggle_pause_process(self, mode: str):
-        core = self.tab_data[mode].get("core_instance")
-        if core:
-            is_paused = core.toggle_pause()
-            if is_paused:
-                self.tab_data[mode]["btns"]["pause"].configure(text="Retomar Fila", fg_color="orange", hover_color="darkorange")
-            else:
-                self.tab_data[mode]["btns"]["pause"].configure(text="Pausar Fila", fg_color="gray", hover_color="darkgray")
-
-    def cancel_process(self, mode: str):
-        core = self.tab_data[mode].get("core_instance")
-        if core:
-            core.request_cancel()
-            self.tab_data[mode]["btns"]["pause"].configure(state="disabled")
-            self.tab_data[mode]["btns"]["cancel"].configure(state="disabled", text="Abortando...")
-
-    def _run_core_logic(self, selected_items, target, workers, mode):
-        manager = ZarManagerCore(
-            selected_items=selected_items, target_directory=target, max_workers=workers, mode=mode,
-            log_callback=self._update_log_from_thread,
-            progress_callback=lambda current, total, ratio: self._update_progress_from_thread(mode, current, total, ratio),
-            status_callback=lambda item, status: self._update_task_status_from_thread(mode, item, status)
-        )
+    def _run_core_logic(self, items, target, workers, mode):
+        manager = ZarManagerCore(items, target, workers, mode, lambda m: self.after(0, self.log_message, m),
+                                 lambda c, t, r: self.after(0, self._update_prog, mode, c, t, r),
+                                 lambda i, s: self.after(0, self._update_status, mode, i, s))
         self.tab_data[mode]["core_instance"] = manager
-        
         try:
-            if manager.verify_environment():
-                manager.start_processing()
-            else:
-                self._update_log_from_thread("[ERRO CRÍTICO] Execução abortada devido à falha ambiental.")
-        finally:
-            self.after(0, lambda: self._reset_ui_controls(mode))
+            if manager.verify_environment(): manager.start_processing()
+        finally: self.after(0, self._reset_ui_controls, mode)
 
-    def _reset_ui_controls(self, mode: str):
-        self.tab_data[mode]["btns"]["start"].configure(state="normal")
-        self.tab_data[mode]["btns"]["pause"].configure(state="disabled", text="Pausar Fila", fg_color="gray")
-        self.tab_data[mode]["btns"]["cancel"].configure(state="disabled", text="Cancelar Operação")
+    def _reset_ui_controls(self, m):
+        self.tab_data[m]["btns"]["start"].configure(state="normal")
+        self.tab_data[m]["btns"]["pause"].configure(state="disabled", text="Pausar Fila")
+        self.tab_data[m]["btns"]["cancel"].configure(state="disabled")
 
-    def _update_log_from_thread(self, message: str):
-        self.after(0, lambda: self.log_message(message))
+    def _update_prog(self, m, c, t, r):
+        self.tab_data[m]["progress"].set(r)
+        self.tab_data[m]["lbl_percentage"].configure(text=f"{int(r * 100)}%")
+        self.tab_data[m]["lbl_counter"].configure(text=f"{c} / {t} concluídos")
+        if c == t and t > 0: self.play_sound("success")
 
-    def _update_progress_from_thread(self, mode: str, current: int, total: int, ratio: float):
-        pct = int(ratio * 100)
-        self.after(0, lambda: self.tab_data[mode]["progress"].set(ratio))
-        self.after(0, lambda: self.tab_data[mode]["lbl_percentage"].configure(text=f"{pct}%"))
-        self.after(0, lambda: self.tab_data[mode]["lbl_counter"].configure(text=f"{current} / {total} itens concluídos"))
+    def _update_status(self, m, item, status):
+        if "FALHA" in status.upper(): self.play_sound("error")
+        tasks = self.tab_data[m]["active_tasks"]
+        frame = self.tab_data[m]["tasks_frame"]
         
-        # Dispara o som de Sucesso ao finalizar todo o lote
-        if current == total and total > 0:
-            self.play_sound("success")
-
-    def _update_task_status_from_thread(self, mode: str, item_name: str, status: str):
-        # Dispara som de erro caso uma etapa falhe gravemente
-        if "FALHA" in status.upper():
-            self.play_sound("error")
-            
-        def update_ui():
-            tasks_dict = self.tab_data[mode]["active_tasks"]
-            frame = self.tab_data[mode]["tasks_frame"]
-            
-            if status in ["CONCLUIDO", "FALHA", "FALHA CRÍTICA", "CANCELADO"]:
-                if item_name in tasks_dict:
-                    tasks_dict[item_name].destroy()
-                    del tasks_dict[item_name]
-            else:
-                if item_name not in tasks_dict:
-                    lbl = ctk.CTkLabel(frame, text=f"• {item_name}: {status}", font=ctk.CTkFont(size=12, weight="bold"))
-                    lbl.pack(anchor="w", padx=10, pady=2)
-                    tasks_dict[item_name] = lbl
-                else:
-                    tasks_dict[item_name].configure(text=f"• {item_name}: {status}")
-        self.after(0, update_ui)
+        if status in ["CONCLUIDO", "FALHA", "FALHA CRÍTICA", "CANCELADO"]:
+            if item in tasks: tasks.pop(item).destroy()
+        else:
+            if item not in tasks:
+                lbl = ctk.CTkLabel(frame, text=f"• {item}: {status}", font=("", 12, "bold"))
+                lbl.pack(anchor="w", padx=10, pady=2)
+                tasks[item] = lbl
+            else: tasks[item].configure(text=f"• {item}: {status}")
 
     def _build_sidebar(self):
         txt_color = self.theme_data["text"]
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color=self.theme_data["sidebar"])
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1) 
+        self.sidebar_frame.grid_rowconfigure(6, weight=1) 
         
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="ZarManager", font=ctk.CTkFont(size=24, weight="bold"), text_color=txt_color)
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 30))
+        ctk.CTkLabel(self.sidebar_frame, text="ZarManager", font=("", 24, "bold"), text_color=self.theme_data["text"]).grid(row=0, column=0, pady=30)
         
-        self.btn_auto = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_auto"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("auto"))
-        self.btn_auto.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
-        ToolTip(self.btn_auto, lambda: self.get_text("tip_auto"))
-        
-        self.btn_extract = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_extract"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("extract"))
-        self.btn_extract.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        ToolTip(self.btn_extract, lambda: self.get_text("tip_extract"))
-        
-        self.btn_compress = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_compress"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("compress"))
-        self.btn_compress.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-        ToolTip(self.btn_compress, lambda: self.get_text("tip_compress"))
-        
-        self.btn_settings = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_settings"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("settings"))
-        self.btn_settings.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
-        
-        self.btn_about = ctk.CTkButton(self.sidebar_frame, text=self.get_text("tab_about"), anchor="w", text_color=txt_color, command=lambda: self.select_frame_by_name("about"))
-        self.btn_about.grid(row=7, column=0, padx=20, pady=(10, 30), sticky="ew")
+        self.btns = {}
+        for mode, lang, r in [("auto", "tab_auto", 1), ("extract_arc", "tab_extract_arc", 2), 
+                              ("extract", "tab_extract", 3), ("compress", "tab_compress", 4)]:
+            b = ctk.CTkButton(self.sidebar_frame, text=self.get_text(lang), anchor="w", text_color=self.theme_data["text"], command=lambda m=mode: self.select_frame_by_name(m))
+            b.grid(row=r, column=0, padx=20, pady=10, sticky="ew")
+            ToolTip(b, lambda lg=f"tip_{mode}": self.get_text(lg))
+            self.btns[mode] = b
+            
+        for mode, lang, r in [("settings", "tab_settings", 7), ("about", "tab_about", 8)]:
+            b = ctk.CTkButton(self.sidebar_frame, text=self.get_text(lang), anchor="w", text_color=self.theme_data["text"], command=lambda m=mode: self.select_frame_by_name(m))
+            b.grid(row=r, column=0, padx=20, pady=10, sticky="ew")
+            self.btns[mode] = b
 
     def _build_main_area(self):
-        self.main_content = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_content.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
-        self.main_content.grid_rowconfigure(0, weight=3) 
-        self.main_content.grid_rowconfigure(1, weight=1) 
-        self.main_content.grid_columnconfigure(0, weight=1)
+        mc = ctk.CTkFrame(self, fg_color="transparent")
+        mc.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        mc.grid_rowconfigure(0, weight=3) 
+        mc.grid_rowconfigure(1, weight=1) 
+        mc.grid_columnconfigure(0, weight=1)
         
-        self.view_container = ctk.CTkFrame(self.main_content, corner_radius=10)
+        self.view_container = ctk.CTkFrame(mc, corner_radius=10)
         self.view_container.grid(row=0, column=0, sticky="nsew", pady=(0, 20))
         self.view_container.grid_rowconfigure(0, weight=1)
         self.view_container.grid_columnconfigure(0, weight=1)
         
-        self.console_frame = ctk.CTkFrame(self.main_content, corner_radius=10)
-        self.console_frame.grid(row=1, column=0, sticky="nsew")
-        self.console_frame.grid_rowconfigure(0, weight=1)
-        self.console_frame.grid_columnconfigure(0, weight=1)
-        
-        self.console_textbox = ctk.CTkTextbox(self.console_frame, font=ctk.CTkFont(family="Monospace", size=13))
+        cf = ctk.CTkFrame(mc, corner_radius=10)
+        cf.grid(row=1, column=0, sticky="nsew")
+        cf.grid_rowconfigure(0, weight=1)
+        cf.grid_columnconfigure(0, weight=1)
+        self.console_textbox = ctk.CTkTextbox(cf, font=("Monospace", 13))
         self.console_textbox.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        
         self.log_message(self.get_text("log_ready"))
 
     def log_message(self, message: str):
@@ -456,31 +375,15 @@ class ZarManagerGUI(ctk.CTk):
         self.console_textbox.insert("end", message + "\n")
         self.console_textbox.see("end")
         self.console_textbox.configure(state="disabled")
-        
-        try:
-            if getattr(sys, 'frozen', False):
-                base_path = Path(sys.executable).parent
-            else:
-                base_path = Path(__file__).parent.resolve()
-                
-            log_file = base_path / "ZarManager_Log.txt"
-            
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(message + "\n")
-        except Exception:
-            pass
 
     def _build_frames(self):
-        self.frames = {}
-        for name in ["auto", "extract", "compress", "settings", "about"]:
-            frame = ctk.CTkFrame(self.view_container, fg_color="transparent")
-            frame.grid(row=0, column=0, sticky="nsew")
-            self.frames[name] = frame
+        self.frames = {n: ctk.CTkFrame(self.view_container, fg_color="transparent") for n in self.btns.keys()}
+        for f in self.frames.values(): f.grid(row=0, column=0, sticky="nsew")
 
-        self._build_action_tab(self.frames["auto"], "tab_auto", "Full Pipeline: Extracts the ISO (XDVDFS) and compresses to ZArchive sequentially.", "auto")
-        self._build_action_tab(self.frames["extract"], "tab_extract", "Isolated Tool: Only extracts the file structure from the ISO (XDVDFS).", "extract")
-        self._build_action_tab(self.frames["compress"], "tab_compress", "Isolated Tool: Only compresses a structured folder into .zar format.", "compress")
-
+        self._build_action_tab(self.frames["auto"], "tab_auto", "Full Pipeline: Descompacta, Extrai XISO e Comprime ZAR.", "auto")
+        self._build_action_tab(self.frames["extract_arc"], "tab_extract_arc", "Apenas extrai de forma plana Arquivos ZIP, RAR e 7Z.", "extract_arc")
+        self._build_action_tab(self.frames["extract"], "tab_extract", "Apenas extrai arquivos de uma imagem .ISO.", "extract")
+        self._build_action_tab(self.frames["compress"], "tab_compress", "Apenas compacta uma pasta estruturada em .zar.", "compress")
         self._populate_settings_frame(self.frames["settings"])
         self._populate_about_frame(self.frames["about"])
 
@@ -488,49 +391,46 @@ class ZarManagerGUI(ctk.CTk):
         frame.grid_rowconfigure(2, weight=1) 
         frame.grid_columnconfigure(0, weight=1)
         
-        lbl_title = ctk.CTkLabel(frame, text=self.get_text(title_key), font=ctk.CTkFont(size=24, weight="bold"))
-        lbl_title.grid(row=0, column=0, sticky="w", padx=30, pady=(30, 5))
-        
-        lbl_desc = ctk.CTkLabel(frame, text=description, text_color="gray", font=ctk.CTkFont(size=12))
-        lbl_desc.grid(row=1, column=0, sticky="w", padx=30, pady=(0, 15))
+        ctk.CTkLabel(frame, text=self.get_text(title_key), font=("", 24, "bold")).grid(row=0, column=0, sticky="w", padx=30, pady=(30, 5))
+        ctk.CTkLabel(frame, text=description, text_color="gray").grid(row=1, column=0, sticky="w", padx=30, pady=(0, 15))
 
         sel_frame = ctk.CTkFrame(frame, fg_color="transparent")
         sel_frame.grid(row=2, column=0, sticky="nsew", padx=30, pady=5)
-        sel_frame.grid_rowconfigure(1, weight=1)
+        
+        # CORREÇÃO MATEMÁTICA DEFINITIVA PARA A LISTA
+        sel_frame.grid_rowconfigure(2, weight=1)
         sel_frame.grid_columnconfigure(0, weight=1)
-        sel_frame.grid_columnconfigure(1, weight=1)
 
         dir_frame = ctk.CTkFrame(sel_frame, fg_color="transparent")
-        dir_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        dir_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         
-        ctk.CTkLabel(dir_frame, text=self.get_text("lbl_source"), font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
-        src_frame = ctk.CTkFrame(dir_frame, fg_color="transparent")
-        src_frame.pack(fill="x", pady=(0, 15))
-        entry_src = ctk.CTkEntry(src_frame)
-        entry_src.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        entry_src.insert(0, self.cfg.get("source_dir"))
-        
-        btn_src = ctk.CTkButton(src_frame, text="Browse...", width=100, fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.select_folder("source_dir", entry_src, mode))
-        btn_src.pack(side="right")
-        ToolTip(btn_src, lambda: self.get_text("tip_source"))
+        for k in ["source", "target"]:
+            ctk.CTkLabel(dir_frame, text=self.get_text(f"lbl_{k}"), font=("", 12, "bold")).pack(anchor="w")
+            f = ctk.CTkFrame(dir_frame, fg_color="transparent")
+            f.pack(fill="x", pady=(0, 15))
+            e = ctk.CTkEntry(f)
+            e.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            e.insert(0, self.cfg.get(f"{k}_dir"))
+            ctk.CTkButton(f, text="Browse", width=100, command=lambda ky=f"{k}_dir", ey=e: self.select_folder(ky, ey, mode)).pack(side="right")
 
-        ctk.CTkLabel(dir_frame, text=self.get_text("lbl_target"), font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
-        tgt_frame = ctk.CTkFrame(dir_frame, fg_color="transparent")
-        tgt_frame.pack(fill="x")
-        entry_tgt = ctk.CTkEntry(tgt_frame)
-        entry_tgt.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        entry_tgt.insert(0, self.cfg.get("target_dir"))
+        ctk.CTkLabel(sel_frame, text="Itens Identificados:", font=("", 12, "bold")).grid(row=1, column=0, sticky="sw", pady=(0,5))
+        ctk.CTkButton(sel_frame, text="Inverter Seleção", width=120, fg_color="gray", command=lambda: self.toggle_all_selections(mode)).grid(row=1, column=1, sticky="se", pady=(0,5))
         
-        btn_tgt = ctk.CTkButton(tgt_frame, text="Browse...", width=100, fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.select_folder("target_dir", entry_tgt))
-        btn_tgt.pack(side="right")
-        ToolTip(btn_tgt, lambda: self.get_text("tip_target"))
-
-        ctk.CTkLabel(sel_frame, text="Itens Identificados (Selecione para processar):", font=ctk.CTkFont(weight="bold")).grid(row=0, column=1, sticky="sw", padx=(10, 0), pady=(0, 5))
-        btn_toggle = ctk.CTkButton(sel_frame, text="Marcar/Desmarcar Todos", width=180, fg_color="gray", hover_color="darkgray", command=lambda m=mode: self.toggle_all_selections(m))
-        btn_toggle.grid(row=0, column=1, sticky="se", padx=(10, 0), pady=(0, 5))
+        # INJEÇÃO ESTRITA DA LISTA USANDO GRID PURO
+        lb_frame = ctk.CTkFrame(sel_frame)
+        lb_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
+        lb_frame.grid_rowconfigure(0, weight=1)
+        lb_frame.grid_columnconfigure(0, weight=1)
         
-        self.tab_data[mode]["scroll_frame"] = ctk.CTkScrollableFrame(sel_frame, height=120)
-        self.tab_data[mode]["scroll_frame"].grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        tv = ttk.Treeview(lb_frame, selectmode="extended", show="tree")
+        tv.grid(row=0, column=0, sticky="nsew", padx=(2, 0), pady=2)
+        
+        sb = ctk.CTkScrollbar(lb_frame, command=tv.yview)
+        sb.grid(row=0, column=1, sticky="ns", padx=(0, 2), pady=2)
+        
+        tv.configure(yscrollcommand=sb.set)
+        
+        self.tab_data[mode]["treeview"] = tv
 
         bot_frame = ctk.CTkFrame(frame, fg_color="transparent")
         bot_frame.grid(row=3, column=0, sticky="ew", padx=30, pady=15)
@@ -540,147 +440,103 @@ class ZarManagerGUI(ctk.CTk):
         self.tab_data[mode]["tasks_frame"].grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         
         info_frame = ctk.CTkFrame(bot_frame, fg_color="transparent")
-        info_frame.grid(row=1, column=0, sticky="ew", pady=(0, 5))
-        info_frame.grid_columnconfigure(0, weight=1)
+        info_frame.grid(row=1, column=0, sticky="ew")
         
-        lbl_counter = ctk.CTkLabel(info_frame, text="0 / 0 itens concluídos", font=ctk.CTkFont(weight="bold"))
-        lbl_counter.pack(side="left")
-        self.tab_data[mode]["lbl_counter"] = lbl_counter
+        self.tab_data[mode]["lbl_counter"] = ctk.CTkLabel(info_frame, text="0/0", font=("", 12, "bold"))
+        self.tab_data[mode]["lbl_counter"].pack(side="left")
+        self.tab_data[mode]["lbl_percentage"] = ctk.CTkLabel(info_frame, text="0%", font=("", 12, "bold"))
+        self.tab_data[mode]["lbl_percentage"].pack(side="right")
 
-        lbl_percentage = ctk.CTkLabel(info_frame, text="0%", font=ctk.CTkFont(weight="bold"))
-        lbl_percentage.pack(side="right")
-        self.tab_data[mode]["lbl_percentage"] = lbl_percentage
-
-        prog_bar = ctk.CTkProgressBar(bot_frame, progress_color=self.theme_data["accent"])
-        prog_bar.grid(row=2, column=0, sticky="ew", pady=(0, 10))
-        prog_bar.set(0)
-        self.tab_data[mode]["progress"] = prog_bar
+        self.tab_data[mode]["progress"] = ctk.CTkProgressBar(bot_frame, progress_color=self.theme_data["accent"])
+        self.tab_data[mode]["progress"].grid(row=2, column=0, sticky="ew", pady=(0, 10))
+        self.tab_data[mode]["progress"].set(0)
 
         ctrl_frame = ctk.CTkFrame(bot_frame, fg_color="transparent")
-        ctrl_frame.grid(row=2, column=1, sticky="e", padx=(15, 0))
+        ctrl_frame.grid(row=2, column=1, sticky="e", padx=15)
         
         btn_start = ctk.CTkButton(ctrl_frame, text="Iniciar Lote", height=35, font=ctk.CTkFont(weight="bold"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda m=mode: self.start_process(m))
         btn_start.pack(side="left", padx=(0, 10))
-        ToolTip(btn_start, lambda: self.get_text("tip_start"))
-        
-        btn_pause = ctk.CTkButton(ctrl_frame, text="Pausar Fila", height=35, font=ctk.CTkFont(weight="bold"), fg_color="gray", hover_color="darkgray", state="disabled", command=lambda m=mode: self.toggle_pause_process(m))
+        btn_pause = ctk.CTkButton(ctrl_frame, text="Pausar Fila", height=35, font=ctk.CTkFont(weight="bold"), fg_color="gray", hover_color="darkgray", state="disabled", command=lambda m=mode: self.tab_data[mode]["core_instance"].toggle_pause())
         btn_pause.pack(side="left", padx=(0, 10))
-        ToolTip(btn_pause, lambda: self.get_text("tip_pause"))
-        
-        btn_cancel = ctk.CTkButton(ctrl_frame, text="Cancelar Operação", height=35, font=ctk.CTkFont(weight="bold"), fg_color="#8B0000", hover_color="#660000", text_color="white", state="disabled", command=lambda m=mode: self.cancel_process(m))
+        btn_cancel = ctk.CTkButton(ctrl_frame, text="Cancelar Operação", height=35, font=ctk.CTkFont(weight="bold"), fg_color="#8B0000", hover_color="#660000", text_color="white", state="disabled", command=lambda m=mode: self.tab_data[mode]["core_instance"].request_cancel())
         btn_cancel.pack(side="left")
-        ToolTip(btn_cancel, lambda: self.get_text("tip_cancel"))
-
-        self.tab_data[mode]["btns"]["start"] = btn_start
-        self.tab_data[mode]["btns"]["pause"] = btn_pause
-        self.tab_data[mode]["btns"]["cancel"] = btn_cancel
+        
+        self.tab_data[mode]["btns"] = {"start": btn_start, "pause": btn_pause, "cancel": btn_cancel}
 
     def _populate_settings_frame(self, frame):
-        lbl_title = ctk.CTkLabel(frame, text=self.get_text("tab_settings"), font=ctk.CTkFont(size=24, weight="bold"))
-        lbl_title.pack(anchor="w", padx=30, pady=(30, 20))
+        ctk.CTkLabel(frame, text=self.get_text("tab_settings"), font=("", 24, "bold")).pack(anchor="w", padx=30, pady=30)
 
-        ctk.CTkLabel(frame, text=self.get_text("lbl_language")).pack(anchor="w", padx=30, pady=(10, 0))
         self.lang_var = ctk.StringVar(value=self.cfg.get("language"))
-        combo_lang = ctk.CTkComboBox(frame, variable=self.lang_var, values=["pt-br", "en"], width=200, button_color=self.theme_data["accent"], button_hover_color=self.theme_data["hover"], command=self.on_setting_change)
-        combo_lang.pack(anchor="w", padx=30, pady=(5, 20))
+        ctk.CTkComboBox(frame, variable=self.lang_var, values=["pt-br", "en"], command=self.on_setting_change).pack(anchor="w", padx=30, pady=10)
 
-        ctk.CTkLabel(frame, text=self.get_text("lbl_theme")).pack(anchor="w", padx=30, pady=(10, 0))
         self.theme_var = ctk.StringVar(value=self.cfg.get("theme"))
-        combo_theme = ctk.CTkComboBox(frame, variable=self.theme_var, values=["Sistema", "Preto", "Branco", "Steam", "Xbox"], width=200, button_color=self.theme_data["accent"], button_hover_color=self.theme_data["hover"], command=self.on_setting_change)
-        combo_theme.pack(anchor="w", padx=30, pady=(5, 20))
+        ctk.CTkComboBox(frame, variable=self.theme_var, values=["Sistema", "Preto", "Branco", "Steam", "Xbox"], command=self.on_setting_change).pack(anchor="w", padx=30, pady=10)
 
         ctk.CTkLabel(frame, text=f'{self.get_text("lbl_workers")} (Atual: {self.cfg.get("workers")})').pack(anchor="w", padx=30, pady=(10, 0))
-        slider_workers = ctk.CTkSlider(frame, from_=1, to=16, number_of_steps=15, width=400, button_color=self.theme_data["accent"], button_hover_color=self.theme_data["hover"], progress_color=self.theme_data["accent"], command=self.on_worker_slider_change)
-        slider_workers.set(self.cfg.get("workers"))
-        slider_workers.pack(anchor="w", padx=30, pady=(5, 15))
+        slider = ctk.CTkSlider(frame, from_=1, to=16, number_of_steps=15, command=self.on_worker_slider_change)
+        slider.set(self.cfg.get("workers"))
+        slider.pack(anchor="w", padx=30, pady=5)
         
-        # MUDANÇA: Switcher de Auto-Update
+        ctk.CTkLabel(frame, text="Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.", text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(20, 20))
+
+    def _populate_about_frame(self, frame):
+        ctk.CTkLabel(frame, text=self.get_text("about_title"), font=("", 24, "bold")).pack(anchor="w", padx=30, pady=30)
+        ctk.CTkLabel(frame, text=f"Versão Atual: {APP_VERSION}", font=("", 14, "bold")).pack(anchor="w", padx=30)
+        
+        fr_tut = ctk.CTkFrame(frame, fg_color=("gray85", "gray15"))
+        fr_tut.pack(fill="x", padx=30, pady=20)
+        ctk.CTkLabel(fr_tut, text=self.get_text("about_tutorial"), justify="left").pack(padx=20, pady=20, anchor="w")
+        
+        ctk.CTkButton(frame, text=self.get_text("btn_github"), command=lambda: self.open_browser(GITHUB_REPO_URL)).pack(anchor="w", padx=30, pady=10)
+        
         auto_val = self.cfg.get("auto_update")
         if auto_val is None:
             auto_val = True
             self.cfg.set("auto_update", True)
             
         self.auto_update_var = ctk.BooleanVar(value=auto_val)
-        switch_auto = ctk.CTkSwitch(frame, text=self.get_text("lbl_auto_update"), variable=self.auto_update_var, command=self.on_auto_update_change, progress_color=self.theme_data["accent"])
-        switch_auto.pack(anchor="w", padx=30, pady=(10, 15))
+        switch_auto = ctk.CTkSwitch(frame, text=self.get_text("lbl_auto_update"), variable=self.auto_update_var, command=self.on_auto_update_change, font=ctk.CTkFont(weight="bold", size=12))
+        switch_auto.pack(anchor="w", padx=30, pady=(20, 10))
         
-        ctk.CTkLabel(frame, text="Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.", text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(10, 20))
-
-    def _populate_about_frame(self, frame):
-        lbl_title = ctk.CTkLabel(frame, text=self.get_text("about_title"), font=ctk.CTkFont(size=24, weight="bold"))
-        lbl_title.pack(anchor="w", padx=30, pady=(30, 10))
-        
-        lbl_version = ctk.CTkLabel(frame, text=f"Versão Atual: {APP_VERSION}", font=ctk.CTkFont(weight="bold"))
-        lbl_version.pack(anchor="w", padx=30, pady=(0, 10))
-        
-        lbl_desc = ctk.CTkLabel(frame, text=self.get_text("about_desc"), wraplength=700, justify="left")
-        lbl_desc.pack(anchor="w", padx=30, pady=(0, 20))
-        
-        tutorial_frame = ctk.CTkFrame(frame, fg_color=("gray85", "gray15"), corner_radius=10)
-        tutorial_frame.pack(fill="x", padx=30, pady=10)
-        ctk.CTkLabel(tutorial_frame, text=self.get_text("about_tutorial"), wraplength=650, justify="left").pack(padx=20, pady=20, anchor="w")
-        
-        btn_github = ctk.CTkButton(frame, text=self.get_text("btn_github"), fg_color=self.theme_data["accent"], hover_color=self.theme_data["hover"], text_color="white", command=lambda: self.open_browser(GITHUB_REPO_URL))
-        btn_github.pack(anchor="w", padx=30, pady=20)
-        
-        self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", hover_color="darkgray", text_color="white", command=self.check_for_updates)
-        self.btn_check_update.pack(anchor="w", padx=30, pady=(10, 5))
-        
-        self.lbl_update_status = ctk.CTkLabel(frame, text="", font=ctk.CTkFont(slant="italic"))
-        self.lbl_update_status.pack(anchor="w", padx=30, pady=0)
-        
-        self.btn_download_update = ctk.CTkButton(frame, text=self.get_text("btn_download_update"), fg_color="#107C10", hover_color="#0B580B", text_color="white")
+        self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", command=self.check_for_updates)
+        self.btn_check_update.pack(anchor="w", padx=30, pady=5)
+        self.lbl_update_status = ctk.CTkLabel(frame, text="", font=("", 12, "italic"))
+        self.lbl_update_status.pack(anchor="w", padx=30)
+        self.btn_download_update = ctk.CTkButton(frame, text=self.get_text("btn_download_update"), fg_color="#107C10", text_color="white")
 
     def check_for_updates(self):
         self.btn_check_update.configure(state="disabled")
-        self.lbl_update_status.configure(text=self.get_text("msg_checking_update"), text_color="gray")
+        self.lbl_update_status.configure(text="Procurando...", text_color="gray")
         self.btn_download_update.pack_forget()
         threading.Thread(target=self._check_for_updates_thread, daemon=True).start()
 
     def check_for_updates_silently(self):
-        """Verifica em segundo plano caso a opção esteja ativa nas configurações"""
-        if not self.cfg.get("auto_update"): 
-            return
+        if not self.cfg.get("auto_update"): return
         threading.Thread(target=self._silent_update_thread, daemon=True).start()
 
     def _silent_update_thread(self):
         try:
-            context = ssl._create_unverified_context()
-            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
-            with urllib.request.urlopen(req, timeout=7, context=context) as response:
-                data = json.loads(response.read().decode())
-                latest_version = data.get("tag_name", "")
-                release_url = data.get("html_url", GITHUB_REPO_URL + "/releases")
-                
-                if latest_version and latest_version != APP_VERSION:
-                    self.after(0, lambda: self._show_update_popup(latest_version, release_url))
-        except Exception:
-            pass # Silenciamento total em caso de falha na checagem em segundo plano
+            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager'})
+            with urllib.request.urlopen(req, timeout=7, context=ssl._create_unverified_context()) as res:
+                data = json.loads(res.read().decode())
+                if data.get("tag_name") not in ["", APP_VERSION]:
+                    self.after(0, lambda: self._show_update_popup(data.get("tag_name"), data.get("html_url")))
+        except Exception: pass 
 
-    def _show_update_popup(self, version, url):
-        resposta = messagebox.askyesno(
-            title=self.get_text("msg_update_popup_title"),
-            message=self.get_text("msg_update_popup_desc").format(version)
-        )
-        if resposta:
+    def _show_update_popup(self, v, url):
+        if messagebox.askyesno(title=self.get_text("msg_update_popup_title"), message=self.get_text("msg_update_popup_desc").format(v)):
             self.open_browser(url)
 
     def _check_for_updates_thread(self):
         try:
-            context = ssl._create_unverified_context()
-            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager-App'})
-            with urllib.request.urlopen(req, timeout=7, context=context) as response:
-                data = json.loads(response.read().decode())
-                latest_version = data.get("tag_name", "")
-                release_url = data.get("html_url", GITHUB_REPO_URL + "/releases")
-                
-                if latest_version and latest_version != APP_VERSION:
-                    msg = self.get_text("msg_update_avail").format(latest_version)
-                    self.after(0, lambda: self._update_ui_update_found(msg, release_url))
+            req = urllib.request.Request(GITHUB_REPO_API, headers={'User-Agent': 'ZarManager'})
+            with urllib.request.urlopen(req, timeout=7, context=ssl._create_unverified_context()) as res:
+                data = json.loads(res.read().decode())
+                v = data.get("tag_name", "")
+                if v and v != APP_VERSION:
+                    self.after(0, lambda: self._update_ui_update_found(self.get_text("msg_update_avail").format(v), data.get("html_url")))
                 else:
-                    msg = self.get_text("msg_update_latest").format(APP_VERSION)
-                    self.after(0, lambda: self._update_ui_update_none(msg))
-                    
+                    self.after(0, lambda: self._update_ui_update_none(self.get_text("msg_update_latest").format(APP_VERSION)))
         except Exception as e:
             self.after(0, lambda: self._update_ui_update_error(str(e)))
 
@@ -688,42 +544,30 @@ class ZarManagerGUI(ctk.CTk):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="green")
         self.btn_download_update.configure(command=lambda: self.open_browser(url))
-        self.btn_download_update.pack(anchor="w", padx=30, pady=(5, 10))
-        self.log_message(f"[SISTEMA] Atualização detectada: {msg}")
+        self.btn_download_update.pack(anchor="w", padx=30, pady=10)
 
     def _update_ui_update_none(self, msg):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="gray")
-        self.log_message(f"[SISTEMA] Verificação concluída. Nenhuma atualização pendente.")
 
-    def _update_ui_update_error(self, error_msg):
+    def _update_ui_update_error(self, err):
         self.btn_check_update.configure(state="normal")
-        self.lbl_update_status.configure(text=self.get_text("msg_update_error"), text_color="red")
-        self.log_message(f"[ERRO] Falha ao verificar atualizações no GitHub: {error_msg}")
+        self.lbl_update_status.configure(text="Falha de rede.", text_color="red")
 
     def select_frame_by_name(self, name: str):
         self.current_frame_name = name
-        base_text_color = self.theme_data["text"]
-        for btn in [self.btn_auto, self.btn_extract, self.btn_compress, self.btn_settings, self.btn_about]:
-            btn.configure(fg_color="transparent", text_color=base_text_color)
-            
-        accent = self.theme_data["accent"]
-        active_text_color = "white"
+        for btn_name, btn in self.btns.items():
+            btn.configure(fg_color=self.theme_data["accent"] if btn_name == name else "transparent", 
+                          text_color="white" if btn_name == name else self.theme_data["text"])
+        self.frames[name].tkraise()
         
-        if name == "auto": self.btn_auto.configure(fg_color=accent, text_color=active_text_color)
-        elif name == "extract": self.btn_extract.configure(fg_color=accent, text_color=active_text_color)
-        elif name == "compress": self.btn_compress.configure(fg_color=accent, text_color=active_text_color)
-        elif name == "settings": self.btn_settings.configure(fg_color=accent, text_color=active_text_color)
-        elif name == "about": self.btn_about.configure(fg_color=accent, text_color=active_text_color)
+        if name in ["auto", "extract_arc", "extract", "compress"]:
+            if not self.tab_data[name]["items"] and self.cfg.get("source_dir"):
+                self.populate_file_list(name, self.cfg.get("source_dir"))
 
-        for frame_name, frame in self.frames.items():
-            if frame_name == name:
-                frame.tkraise()
-                
     def on_setting_change(self, choice):
         self.cfg.set("language", self.lang_var.get())
         self.cfg.set("theme", self.theme_var.get())
-        self.log_message(f"[SISTEMA] Refatorando interface gráfica para: {self.theme_var.get()} / {self.lang_var.get()}...")
         self.refresh_ui()
 
     def on_worker_slider_change(self, value):
