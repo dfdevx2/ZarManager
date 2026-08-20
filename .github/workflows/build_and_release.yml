@@ -52,26 +52,35 @@ jobs:
         run: pyinstaller ZarManager.spec
       - name: Prepare AppImage Directory
         run: |
-          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/bin
           cp -r dist/ZarManager/* AppDir/usr/bin/
-          cp img/logo.png AppDir/usr/share/icons/hicolor/256x256/apps/zarmanager.png
           
-          # Cria o ficheiro Desktop Entry de forma robusta
-          cat <<EOF > AppDir/usr/share/applications/zarmanager.desktop
+          # Cria o atalho Desktop nativo do Linux
+          cat <<EOF > AppDir/ZarManager.desktop
           [Desktop Entry]
           Type=Application
           Name=ZarManager
           Exec=ZarManager
-          Icon=zarmanager
+          Icon=ZarManager
           Categories=Utility;
           EOF
           
-          # Cria o atalho obrigatório AppRun para o AppImage
-          cd AppDir
-          ln -s usr/bin/ZarManager AppRun
-          cd ..
+          # Lógica à prova de balas para o ícone
+          if [ -f img/icon.ico ]; then
+            cp img/icon.ico AppDir/ZarManager.png
+          else
+            touch AppDir/ZarManager.png
+          fi
           
-          # Descarrega a versão Contínua do AppImageTool e constrói
+          # Cria o AppRun seguro
+          cat <<'EOF' > AppDir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "$HERE/usr/bin/ZarManager" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          
+          # Constrói o AppImage
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
           ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ZarManager-Linux-x86_64.AppImage
@@ -89,8 +98,9 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          body_path: CHANGELOG.md
           files: |
             Windows-Build/ZarManager-Windows.zip
             Linux-Build/ZarManager-Linux-x86_64.AppImage
