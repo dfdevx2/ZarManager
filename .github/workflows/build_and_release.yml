@@ -33,7 +33,7 @@ jobs:
           path: ZarManager-Windows.zip
 
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     # DECLARAÇÃO GLOBAL DE NÃO INTERATIVIDADE PARA O APT-GET
     env:
       DEBIAN_FRONTEND: noninteractive
