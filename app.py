@@ -12,6 +12,7 @@ import json
 import platform
 import ssl
 import subprocess
+import locale
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from config import ConfigManager
@@ -90,7 +91,28 @@ class ZarManagerGUI(ctk.CTk):
             ctk.set_window_scaling(1.1)
             ctk.set_widget_scaling(1.1)
             
-        self.cfg = ConfigManager()
+        # ===================================================
+        # GESTOR DE CONFIG (PRODUÇÃO VS DESENVOLVIMENTO)
+        # ===================================================
+        if getattr(sys, 'frozen', False):
+            # 1. MODO COMPILADO (.exe, Flatpak, AppImage): Usa o ficheiro real e guarda no disco
+            self.cfg = ConfigManager()
+        else:
+            # 2. MODO DE TESTE (VS Code/Terminal): Memória volátil. Abre sempre do zero!
+            class DevConfig:
+                def __init__(self):
+                    self.mem = {"workers": 4, "auto_update": True, "source_dir": "", "target_dir": ""}
+                def get(self, key, default=""): 
+                    val = self.mem.get(key, default)
+                    return "" if val is None else val
+                def set(self, key, value): 
+                    self.mem[key] = value
+            self.cfg = DevConfig()
+            print("\n[DEV MODE ATIVO] O ZarManager está a rodar na RAM. Nenhuma config será guardada.\n")
+        
+        if not self.cfg.get("first_boot_done"):
+            self._run_first_boot_setup()
+            
         self.title(f"ZarManager {APP_VERSION}")
         
         self.minsize(950, 650)
@@ -126,6 +148,67 @@ class ZarManagerGUI(ctk.CTk):
             
         self.after(200, self._force_render_refresh)
         self.after(2000, self.check_for_updates_silently)
+
+    def _run_first_boot_setup(self):
+        try:
+            sys_lang = locale.getdefaultlocale()[0] or "en"
+            if sys_lang.lower().startswith("pt"):
+                self.cfg.set("language", "pt-br")
+            else:
+                self.cfg.set("language", "en")
+        except:
+            self.cfg.set("language", "en")
+            
+        self.withdraw()
+        
+        setup_win = ctk.CTkToplevel(self)
+        setup_win.title("Welcome to ZarManager")
+        setup_win.geometry("500x380")
+        setup_win.resizable(False, False)
+        setup_win.attributes("-topmost", True)
+        
+        setup_win.update_idletasks()
+        x = (setup_win.winfo_screenwidth() - setup_win.winfo_reqwidth()) // 2
+        y = (setup_win.winfo_screenheight() - setup_win.winfo_reqheight()) // 2
+        setup_win.geometry(f"+{x}+{y}")
+        
+        ctk.CTkLabel(setup_win, text="Bem-vindo / Welcome", font=("Segoe UI", 26, "bold")).pack(pady=(25, 5))
+        ctk.CTkLabel(setup_win, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 14)).pack(pady=(0, 20))
+        
+        self.temp_theme_var = ctk.StringVar(value="Sistema")
+        
+        themes_frame = ctk.CTkFrame(setup_win, fg_color="transparent")
+        themes_frame.pack(pady=5, fill="both", expand=True, padx=30)
+        
+        row, col = 0, 0
+        for theme_name, colors in THEME_COLORS.items():
+            accent = colors["accent"][1] if isinstance(colors["accent"], tuple) else colors["accent"]
+            bg = colors["sidebar"][1] if isinstance(colors["sidebar"], tuple) else colors["sidebar"]
+            
+            frame_item = ctk.CTkFrame(themes_frame, fg_color="transparent")
+            frame_item.grid(row=row, column=col, padx=15, pady=10, sticky="w")
+            
+            rb = ctk.CTkRadioButton(frame_item, text=theme_name, variable=self.temp_theme_var, value=theme_name, 
+                                    fg_color=accent, text_color=accent, font=("Segoe UI", 14, "bold"))
+            rb.pack(side="left")
+            
+            color_box = ctk.CTkFrame(frame_item, width=22, height=22, fg_color=bg, border_width=2, border_color=accent)
+            color_box.pack(side="left", padx=(10, 0))
+            
+            col += 1
+            if col > 1:
+                col = 0
+                row += 1
+        
+        def on_finish():
+            self.cfg.set("theme", self.temp_theme_var.get())
+            self.cfg.set("first_boot_done", True)
+            setup_win.destroy()
+            self.deiconify()
+            
+        ctk.CTkButton(setup_win, text="Continuar / Continue", command=on_finish, height=35, font=("Segoe UI", 14, "bold")).pack(pady=20)
+        
+        self.wait_window(setup_win)
 
     def _force_render_refresh(self):
         w = self.winfo_width()
@@ -285,7 +368,6 @@ class ZarManagerGUI(ctk.CTk):
                 if not selected_items: return self.log_message("[AVISO] Fila vazia após pular conflitos.")
                 self.log_message(f"[AVISO] Pulando {len(collisions)} itens.")
 
-        # CAIXA DE DIÁLOGO DE DELEÇÃO/MANUTENÇÃO DE ARQUIVOS
         keep_originals = messagebox.askyesno(
             title=self.get_text("delete_title"), 
             message=self.get_text("delete_msg")
@@ -321,6 +403,7 @@ class ZarManagerGUI(ctk.CTk):
         if c == t and t > 0: self.play_sound("success")
 
     def _update_status(self, m, item, status):
+        # Esta função agora recebe centenas de atualizações do subprocess em tempo real
         if "FALHA" in status.upper(): self.play_sound("error")
         tasks = self.tab_data[m]["active_tasks"]
         frame = self.tab_data[m]["tasks_frame"]
@@ -329,10 +412,12 @@ class ZarManagerGUI(ctk.CTk):
             if item in tasks: tasks.pop(item).destroy()
         else:
             if item not in tasks:
-                lbl = ctk.CTkLabel(frame, text=f"• {item}: {status}", font=("", 12, "bold"))
-                lbl.pack(anchor="w", padx=10, pady=2)
+                # Estilo premium: Fonte maior, negrito e com a cor de destaque do tema
+                lbl = ctk.CTkLabel(frame, text=f"• {item}: {status}", font=("Segoe UI", 13, "bold"), text_color=self.theme_data["accent"])
+                lbl.pack(anchor="w", padx=15, pady=4)
                 tasks[item] = lbl
-            else: tasks[item].configure(text=f"• {item}: {status}")
+            else: 
+                tasks[item].configure(text=f"• {item}: {status}")
 
     def _build_sidebar(self):
         txt_color = self.theme_data["text"]
@@ -450,7 +535,8 @@ class ZarManagerGUI(ctk.CTk):
         self.tab_data[mode]["lbl_percentage"] = ctk.CTkLabel(info_frame, text="0%", font=("", 12, "bold"))
         self.tab_data[mode]["lbl_percentage"].pack(side="right")
 
-        self.tab_data[mode]["progress"] = ctk.CTkProgressBar(bot_frame, progress_color=self.theme_data["accent"])
+        # Barra de progresso grossa e bonita (sem duplicações)
+        self.tab_data[mode]["progress"] = ctk.CTkProgressBar(bot_frame, progress_color=self.theme_data["accent"], height=22, corner_radius=8)
         self.tab_data[mode]["progress"].grid(row=2, column=0, sticky="ew", pady=(0, 10))
         self.tab_data[mode]["progress"].set(0)
 
@@ -480,33 +566,51 @@ class ZarManagerGUI(ctk.CTk):
         slider.set(self.cfg.get("workers"))
         slider.pack(anchor="w", padx=30, pady=5)
         
-        # TEXTO DE AVISO AGORA DINÂMICO CONFORME O IDIOMA
         ctk.CTkLabel(frame, text=self.get_text("worker_warning"), text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(20, 20))
 
     def _populate_about_frame(self, frame):
-        ctk.CTkLabel(frame, text=self.get_text("about_title"), font=("", 24, "bold")).pack(anchor="w", padx=30, pady=30)
-        ctk.CTkLabel(frame, text=f"Versão Atual: {APP_VERSION}", font=("", 14, "bold")).pack(anchor="w", padx=30)
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
         
-        fr_tut = ctk.CTkFrame(frame, fg_color=("gray85", "gray15"))
-        fr_tut.pack(fill="x", padx=30, pady=20)
-        ctk.CTkLabel(fr_tut, text=self.get_text("about_tutorial"), justify="left").pack(padx=20, pady=20, anchor="w")
+        center_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        center_frame.grid(row=0, column=0, sticky="nsew", padx=40, pady=40)
+
+        ctk.CTkLabel(center_frame, text="ZarManager", font=("Segoe UI", 32, "bold")).pack(anchor="w", pady=(0, 2))
+        ctk.CTkLabel(center_frame, text=f"Versão Atual: {APP_VERSION}", font=("Segoe UI", 14, "italic"), text_color="gray").pack(anchor="w", pady=(0, 20))
         
-        ctk.CTkButton(frame, text=self.get_text("btn_github"), command=lambda: self.open_browser(GITHUB_REPO_URL)).pack(anchor="w", padx=30, pady=10)
+        fr_tut = ctk.CTkFrame(center_frame, fg_color=("gray85", "gray15"), corner_radius=10)
+        fr_tut.pack(fill="x", pady=10)
+        ctk.CTkLabel(fr_tut, text=self.get_text("about_tutorial"), justify="left", font=("Segoe UI", 13)).pack(padx=20, pady=20, anchor="w")
         
+        info_box = ctk.CTkFrame(center_frame, fg_color="transparent")
+        info_box.pack(fill="x", pady=10)
+        
+        ctk.CTkLabel(info_box, text="💻 Desenvolvedor: dfdevx2", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=2)
+        ctk.CTkLabel(info_box, text="📜 Licença: MIT License", font=("Segoe UI", 13)).pack(anchor="w", pady=2)
+        
+        link_lbl = ctk.CTkLabel(info_box, text="🌐 Repositório Oficial no GitHub", font=("Segoe UI", 13, "bold", "underline"), text_color="#3B8ED0", cursor="hand2")
+        link_lbl.pack(anchor="w", pady=2)
+        link_lbl.bind("<Button-1>", lambda e: self.open_browser(GITHUB_REPO_URL))
+
+        updates_frame = ctk.CTkFrame(center_frame, fg_color="transparent")
+        updates_frame.pack(fill="x", pady=(30, 10))
+
         auto_val = self.cfg.get("auto_update")
         if auto_val is None:
             auto_val = True
             self.cfg.set("auto_update", True)
             
         self.auto_update_var = ctk.BooleanVar(value=auto_val)
-        switch_auto = ctk.CTkSwitch(frame, text=self.get_text("lbl_auto_update"), variable=self.auto_update_var, command=self.on_auto_update_change, font=ctk.CTkFont(weight="bold", size=12))
-        switch_auto.pack(anchor="w", padx=30, pady=(20, 10))
+        switch_auto = ctk.CTkSwitch(updates_frame, text=self.get_text("lbl_auto_update"), variable=self.auto_update_var, command=self.on_auto_update_change, font=("Segoe UI", 12, "bold"))
+        switch_auto.pack(side="left", padx=(0, 20))
         
-        self.btn_check_update = ctk.CTkButton(frame, text=self.get_text("btn_check_update"), fg_color="gray", command=self.check_for_updates)
-        self.btn_check_update.pack(anchor="w", padx=30, pady=5)
-        self.lbl_update_status = ctk.CTkLabel(frame, text="", font=("", 12, "italic"))
-        self.lbl_update_status.pack(anchor="w", padx=30)
-        self.btn_download_update = ctk.CTkButton(frame, text=self.get_text("btn_download_update"), fg_color="#107C10", text_color="white")
+        self.btn_check_update = ctk.CTkButton(updates_frame, text=self.get_text("btn_check_update"), fg_color="gray", command=self.check_for_updates)
+        self.btn_check_update.pack(side="left")
+        
+        self.lbl_update_status = ctk.CTkLabel(updates_frame, text="", font=("Segoe UI", 12, "italic"))
+        self.lbl_update_status.pack(side="left", padx=20)
+        
+        self.btn_download_update = ctk.CTkButton(center_frame, text=self.get_text("btn_download_update"), fg_color="#107C10", text_color="white")
 
     def check_for_updates(self):
         self.btn_check_update.configure(state="disabled")
@@ -548,7 +652,7 @@ class ZarManagerGUI(ctk.CTk):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text=msg, text_color="green")
         self.btn_download_update.configure(command=lambda: self.open_browser(url))
-        self.btn_download_update.pack(anchor="w", padx=30, pady=10)
+        self.btn_download_update.pack(anchor="w", pady=10)
 
     def _update_ui_update_none(self, msg):
         self.btn_check_update.configure(state="normal")

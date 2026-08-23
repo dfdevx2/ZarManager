@@ -5,6 +5,8 @@ import subprocess
 import threading
 import platform
 import shutil
+import time
+import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -25,6 +27,10 @@ class ZarManagerCore:
         
         self.completed_tasks = 0
         self.total_tasks = len(self.items)
+        
+        # Dicionário para rastrear o progresso exato (0.0 a 1.0) de cada ficheiro independentemente
+        self.file_progress = {Path(p).name: 0.0 for p in selected_items}
+        self.file_progress_lock = threading.Lock()
         
         if getattr(sys, 'frozen', False):
             self.base_dir = Path(sys._MEIPASS)
@@ -87,9 +93,16 @@ class ZarManagerCore:
                     self.log(f"[ERRO THREAD] Falha: {str(e)}")
 
         if self.cancel_flag.is_set():
-            self.log("[SISTEMA] Lote abortado pelo usuário.")
+            self.log("[SISTEMA] Lote abortado pelo utilizador.")
         else:
             self.log("[SISTEMA] Lote concluído com sucesso.")
+
+    def update_file_progress(self, name, progress):
+        """Calcula o progresso global combinando a percentagem em tempo real de todas as threads"""
+        with self.file_progress_lock:
+            self.file_progress[name] = progress
+            total_ratio = sum(self.file_progress.values()) / self.total_tasks
+        self.progress_cb(self.completed_tasks, self.total_tasks, total_ratio)
 
     def _pipeline(self, item_path: Path):
         if self.cancel_flag.is_set():
@@ -99,20 +112,42 @@ class ZarManagerCore:
         self.pause_flag.wait()
         original_name = item_path.name
         current_path = item_path
+        original_suffix = current_path.suffix.lower()
+
+        # Motor de Pesos: Divide a barra de progresso do ficheiro consoante o seu tipo e modo
+        def get_step_info(step_id):
+            if self.mode == 'auto':
+                if original_suffix in ['.zip', '.rar', '.7z', '.tar', '.gz']:
+                    if step_id == '7z': return 0.0, 0.33
+                    if step_id == 'xiso': return 0.33, 0.33
+                    if step_id == 'zar': return 0.66, 0.34
+                elif original_suffix == '.iso':
+                    if step_id == 'xiso': return 0.0, 0.50
+                    if step_id == 'zar': return 0.50, 0.50
+                else:
+                    if step_id == 'zar': return 0.0, 1.0
+            return 0.0, 1.0
 
         try:
-            # ETAPA 1: 7-Zip (Extração Plana)
+            # ETAPA 1: 7-Zip
             if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-                self.status_cb(original_name, "DESCOMPACTANDO...")
-                
                 temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
                 cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
-                self._run_cmd(cmd)
+                
+                b, w = get_step_info('7z')
+                self._run_cmd(cmd, cwd=str(self.target_dir), original_name=original_name, step_name="DESCOMPACTANDO", base_prog=b, weight_prog=w)
+                self.update_file_progress(original_name, b + w)
                 
                 iso_files = list(temp_extract_dir.glob("*.iso"))
-                
                 if iso_files:
-                    target_file = self.target_dir / iso_files[0].name
+                    original_stem = Path(original_name).stem
+                    target_file = self.target_dir / f"{original_stem}.iso"
+                    
+                    counter = 1
+                    while target_file.exists():
+                        target_file = self.target_dir / f"{original_stem} ({counter}).iso"
+                        counter += 1
+                        
                     shutil.move(str(iso_files[0]), str(target_file))
                     current_path = target_file
                 else:
@@ -122,7 +157,6 @@ class ZarManagerCore:
                 
                 shutil.rmtree(temp_extract_dir, ignore_errors=True)
                 
-                # SÓ APAGA O RAR/ZIP ORIGINAL SE NÃO FOR PARA MANTER
                 if not self.keep_originals:
                     try: item_path.unlink()
                     except: pass
@@ -133,24 +167,19 @@ class ZarManagerCore:
 
             # ETAPA 2: Extrair XISO
             if self.mode in ['auto', 'extract'] and current_path.is_file() and current_path.suffix.lower() == '.iso':
-                self.status_cb(original_name, "EXTRAINDO ISO...")
+                iso_extract_dir = self.target_dir / current_path.stem
+                iso_extract_dir.mkdir(parents=True, exist_ok=True)
                 
-                if current_path.parent != self.target_dir:
-                    new_iso_path = self.target_dir / current_path.name
-                    shutil.move(str(current_path), str(new_iso_path))
-                    current_path = new_iso_path
+                cmd = [str(self.xiso_bin), "-x", str(current_path), "-d", str(iso_extract_dir)]
+                b, w = get_step_info('xiso')
+                self._run_cmd(cmd, cwd=str(self.target_dir), original_name=original_name, step_name="EXTRAINDO ISO", base_prog=b, weight_prog=w)
+                self.update_file_progress(original_name, b + w)
                 
-                cmd = [str(self.xiso_bin), "-x", str(current_path), "-d", str(self.target_dir)]
-                self._run_cmd(cmd)
-                
-                extracted_folder = self.target_dir / current_path.stem
-                
-                # SÓ APAGA A ISO ORIGINAL SE NÃO FOR PARA MANTER
                 if not self.keep_originals:
                     try: current_path.unlink() 
                     except: pass
                     
-                current_path = extracted_folder
+                current_path = iso_extract_dir
                 
                 if self.mode == 'extract':
                     self._finalize_item(original_name, "CONCLUIDO")
@@ -158,13 +187,14 @@ class ZarManagerCore:
 
             # ETAPA 3: Comprimir para ZAR
             if self.mode in ['auto', 'compress'] and current_path.is_dir():
-                self.status_cb(original_name, "COMPRIMINDO ZAR...")
                 zar_output = self.target_dir / f"{current_path.name}.zar"
+                # CORREÇÃO CRÍTICA DO ZARCHIVE: A ordem correta é ZArchive [origem] [destino]
+                cmd = [str(self.zar_bin), str(current_path), str(zar_output)]
                 
-                cmd = [str(self.zar_bin), str(zar_output), str(current_path)]
-                self._run_cmd(cmd)
+                b, w = get_step_info('zar')
+                self._run_cmd(cmd, cwd=str(self.target_dir), original_name=original_name, step_name="COMPRIMINDO ZAR", base_prog=b, weight_prog=w)
+                self.update_file_progress(original_name, b + w)
                 
-                # SÓ APAGA A PASTA EXTRAÍDA SE NÃO FOR PARA MANTER
                 if not self.keep_originals:
                     shutil.rmtree(current_path, ignore_errors=True)
                 
@@ -174,25 +204,62 @@ class ZarManagerCore:
             self.log(f"[ERRO NO ARQUIVO] {original_name}: {str(e)}")
             self._finalize_item(original_name, "FALHA")
 
-    def _run_cmd(self, cmd_list):
+    def _run_cmd(self, cmd_list, cwd=None, original_name=None, step_name="PROCESSANDO", base_prog=0.0, weight_prog=1.0):
         if self.cancel_flag.is_set():
-            raise Exception("Cancelado.")
+            raise Exception("Cancelado pelo utilizador.")
             
         creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
-        process = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags)
         
-        while process.poll() is None:
-            if self.cancel_flag.is_set():
-                process.terminate()
-                raise Exception("Processo abortado.")
-            process.stdout.readline() 
+        if "7z" in str(cmd_list[0]).lower() and "-bsp1" not in cmd_list:
+            cmd_list.append("-bsp1")
             
-        if process.returncode != 0 and not self.cancel_flag.is_set():
-            raise Exception(f"Falha com código {process.returncode}")
+        last_update = 0
+        last_line = ""
+        
+        with subprocess.Popen(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=False, bufsize=0, creationflags=creationflags, cwd=cwd) as process:
+            buffer = bytearray()
+            while True:
+                if self.cancel_flag.is_set():
+                    process.kill()
+                    raise Exception("Processo abortado.")
+                
+                char = process.stdout.read(1)
+                
+                if not char and process.poll() is not None:
+                    break
+                    
+                if char:
+                    if char in (b'\r', b'\n'):
+                        if buffer:
+                            try:
+                                clean_line = buffer.decode('utf-8', errors='ignore').strip()
+                                buffer.clear()
+                                
+                                if clean_line:
+                                    last_line = clean_line
+                                    if original_name and self.status_cb and (time.time() - last_update > 0.15):
+                                        perc_match = re.search(r'(\d+)%', clean_line)
+                                        if perc_match:
+                                            local_perc = float(perc_match.group(1)) / 100.0
+                                            current_file_prog = base_prog + (local_perc * weight_prog)
+                                            self.update_file_progress(original_name, current_file_prog)
+                                            self.status_cb(original_name, f"{step_name} [{perc_match.group(1)}%]")
+                                        else:
+                                            short_line = clean_line if len(clean_line) < 45 else "..." + clean_line[-42:]
+                                            self.status_cb(original_name, f"{step_name} ({short_line})")
+                                        last_update = time.time()
+                            except: pass
+                    else:
+                        buffer.extend(char)
+                        
+            if process.returncode != 0 and not self.cancel_flag.is_set():
+                raise Exception(last_line if last_line else f"Falha com código {process.returncode}")
 
     def _finalize_item(self, name, status):
         self.status_cb(name, status)
-        with threading.Lock():
+        with self.file_progress_lock:
+            if status == "CONCLUIDO":
+                self.file_progress[name] = 1.0
             self.completed_tasks += 1
-            ratio = self.completed_tasks / self.total_tasks
-            self.progress_cb(self.completed_tasks, self.total_tasks, ratio)
+            total_ratio = sum(self.file_progress.values()) / self.total_tasks
+            self.progress_cb(self.completed_tasks, self.total_tasks, total_ratio)
