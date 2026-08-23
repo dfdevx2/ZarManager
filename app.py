@@ -108,17 +108,6 @@ class ZarManagerGUI(ctk.CTk):
             self.cfg = DevConfig()
             print("\n[DEV MODE ATIVO] O ZarManager está a rodar na RAM. Nenhuma config será guardada.\n")
             
-        # 1. INJEÇÃO DE SOBREVIVÊNCIA (IMPEDE O CRASH FATAL)
-        if not self.cfg.get("language"):
-            try:
-                sys_lang = locale.getdefaultlocale()[0] or "en"
-                self.cfg.set("language", "pt-br" if sys_lang.lower().startswith("pt") else "en")
-            except:
-                self.cfg.set("language", "en")
-                
-        if not self.cfg.get("theme"):
-            self.cfg.set("theme", "Sistema")
-            
         self.title(f"ZarManager {APP_VERSION}")
         self.minsize(950, 650)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -141,18 +130,14 @@ class ZarManagerGUI(ctk.CTk):
         
         self.current_frame_name = "auto"
         
-        # 2. CONSTRÓI A INTERFACE EM SEGURANÇA (Agora o idioma existe!)
-        self.build_all()
-
-        # 3. LÓGICA DE BOAS-VINDAS
+        # O SISTEMA DE ARRANQUE À PROVA DE SEGFAULTS
         if not self.cfg.get("first_boot_done"):
-            self.withdraw()
-            self.after(200, self._run_first_boot_setup)
+            self._build_first_boot_ui()
         else:
+            self.build_all()
             self._apply_saved_geometry()
-            
-        self.after(200, self._force_render_refresh)
-        self.after(2000, self.check_for_updates_silently)
+            self.after(200, self._force_render_refresh)
+            self.after(2000, self.check_for_updates_silently)
 
     def _apply_saved_geometry(self):
         saved_geometry = self.cfg.get("window_geometry")
@@ -164,25 +149,29 @@ class ZarManagerGUI(ctk.CTk):
             y = (self.winfo_screenheight() // 2) - (h // 2)
             self.geometry(f"{w}x{h}+{x}+{y}")
 
-    def _run_first_boot_setup(self):
-        setup_win = ctk.CTkToplevel(self)
-        setup_win.title("Welcome to ZarManager")
-        setup_win.geometry("500x380")
-        setup_win.resizable(False, False)
-        setup_win.attributes("-topmost", True)
+    def _build_first_boot_ui(self):
+        """Constrói a interface de Boas-vindas DENTRO da janela principal. Sem Toplevels, sem Segfaults."""
+        try:
+            sys_lang = locale.getdefaultlocale()[0] or "en"
+            self.cfg.set("language", "pt-br" if sys_lang.lower().startswith("pt") else "en")
+        except:
+            self.cfg.set("language", "en")
+            
+        if not self.cfg.get("theme"):
+            self.cfg.set("theme", "Sistema")
+            
+        self._apply_saved_geometry()
         
-        setup_win.update_idletasks()
-        x = (setup_win.winfo_screenwidth() - setup_win.winfo_reqwidth()) // 2
-        y = (setup_win.winfo_screenheight() - setup_win.winfo_reqheight()) // 2
-        setup_win.geometry(f"+{x}+{y}")
+        setup_frame = ctk.CTkFrame(self, fg_color="transparent")
+        setup_frame.grid(row=0, column=0, columnspan=2)
         
-        ctk.CTkLabel(setup_win, text="Bem-vindo / Welcome", font=("Segoe UI", 26, "bold")).pack(pady=(25, 5))
-        ctk.CTkLabel(setup_win, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 14)).pack(pady=(0, 20))
+        ctk.CTkLabel(setup_frame, text="Bem-vindo / Welcome", font=("Segoe UI", 36, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(setup_frame, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 16)).pack(pady=(0, 40))
         
         self.temp_theme_var = ctk.StringVar(value=self.cfg.get("theme"))
         
-        themes_frame = ctk.CTkFrame(setup_win, fg_color="transparent")
-        themes_frame.pack(pady=5, fill="both", expand=True, padx=30)
+        themes_frame = ctk.CTkFrame(setup_frame, fg_color="transparent")
+        themes_frame.pack(pady=5)
         
         row, col = 0, 0
         for theme_name, colors in THEME_COLORS.items():
@@ -190,30 +179,34 @@ class ZarManagerGUI(ctk.CTk):
             bg = colors["sidebar"][1] if isinstance(colors["sidebar"], tuple) else colors["sidebar"]
             
             frame_item = ctk.CTkFrame(themes_frame, fg_color="transparent")
-            frame_item.grid(row=row, column=col, padx=15, pady=10, sticky="w")
+            frame_item.grid(row=row, column=col, padx=20, pady=15, sticky="w")
             
             rb = ctk.CTkRadioButton(frame_item, text=theme_name, variable=self.temp_theme_var, value=theme_name, 
-                                    fg_color=accent, text_color=accent, font=("Segoe UI", 14, "bold"))
+                                    fg_color=accent, text_color=accent, font=("Segoe UI", 15, "bold"))
             rb.pack(side="left")
             
-            color_box = ctk.CTkFrame(frame_item, width=22, height=22, fg_color=bg, border_width=2, border_color=accent)
+            color_box = ctk.CTkFrame(frame_item, width=26, height=26, fg_color=bg, border_width=2, border_color=accent)
             color_box.pack(side="left", padx=(10, 0))
             
             col += 1
-            if col > 1:
+            if col > 2:
                 col = 0
                 row += 1
         
         def on_finish():
             self.cfg.set("theme", self.temp_theme_var.get())
             self.cfg.set("first_boot_done", True)
-            setup_win.destroy()
             
-            self.refresh_ui()
+            # Destrói o ecrã de setup e constrói a aplicação no mesmo canvas
+            for widget in self.winfo_children():
+                widget.destroy()
+                
+            self.build_all()
             self._apply_saved_geometry()
-            self.deiconify()
+            self.after(200, self._force_render_refresh)
+            self.after(2000, self.check_for_updates_silently)
             
-        ctk.CTkButton(setup_win, text="Continuar / Continue", command=on_finish, height=35, font=("Segoe UI", 14, "bold")).pack(pady=20)
+        ctk.CTkButton(setup_frame, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
 
     def _force_render_refresh(self):
         w = self.winfo_width()
