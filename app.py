@@ -86,26 +86,8 @@ class ZarManagerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        if platform.system() == "Linux":
-            ctk.set_window_scaling(1.1)
-            ctk.set_widget_scaling(1.1)
-            
-        # ===================================================
-        # GESTOR DE CONFIG (PRODUÇÃO VS DESENVOLVIMENTO)
-        # ===================================================
-        if getattr(sys, 'frozen', False):
-            self.cfg = ConfigManager()
-        else:
-            class DevConfig:
-                def __init__(self):
-                    self.mem = {"workers": 4, "auto_update": True, "source_dir": "", "target_dir": ""}
-                def get(self, key, default=""): 
-                    val = self.mem.get(key, default)
-                    return "" if val is None else val
-                def set(self, key, value): 
-                    self.mem[key] = value
-            self.cfg = DevConfig()
-            print("\n[DEV MODE ATIVO] O ZarManager está a rodar na RAM. Nenhuma config será guardada.\n")
+        # APENAS CÓDIGO DE PRODUÇÃO (MODO DEV FOI ANIQUILADO)
+        self.cfg = ConfigManager()
             
         self.title(f"ZarManager {APP_VERSION}")
         self.minsize(950, 650)
@@ -136,6 +118,7 @@ class ZarManagerGUI(ctk.CTk):
             self.build_all()
             self._apply_saved_geometry()
             
+            # PREVENÇÃO DE WAYLAND GLITCH: Updates forçados de janela só rodam no Windows
             if platform.system() == "Windows":
                 self.after(200, self._force_render_refresh)
             self.after(2000, self.check_for_updates_silently)
@@ -145,16 +128,17 @@ class ZarManagerGUI(ctk.CTk):
         if saved_geometry:
             self.geometry(saved_geometry)
         else:
-            # 100% SEGURO NO LINUX: Sem chamar winfo_screenwidth antes do ecrã mapear!
+            # 100% SEGURO NO LINUX: Sem chamar matemáticas de ecrã antes dele mapear
             self.geometry("1200x800")
 
     def _build_first_boot_ui(self):
-        # 100% SEGURO: Sem usar o pacote 'locale' do Python que entra em conflito com o AppImage.
+        # 100% SEGURO: Usar variáveis de ambiente básicas em vez do módulo C 'locale'
         sys_lang = os.environ.get("LANG", "en").lower()
         self.cfg.set("language", "pt-br" if "pt" in sys_lang else "en")
             
+        # BLINDAGEM LINUX DBUS: Previne Falha de Segmentação forçando o Dark Mode inicial
         if not self.cfg.get("theme"):
-            self.cfg.set("theme", "Sistema")
+            self.cfg.set("theme", "Preto" if platform.system() == "Linux" else "Sistema")
             
         self._apply_saved_geometry()
         
@@ -211,7 +195,6 @@ class ZarManagerGUI(ctk.CTk):
         ctk.CTkButton(center, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
 
     def _force_render_refresh(self):
-        if platform.system() == "Linux": return # Previne glitches de Wayland/X11
         w = self.winfo_width()
         h = self.winfo_height()
         if w > 100 and h > 100:
@@ -255,6 +238,11 @@ class ZarManagerGUI(ctk.CTk):
 
     def apply_appearance(self):
         theme_name = self.cfg.get("theme")
+        
+        # BLINDAGEM DBUS: AppImages crasham no Linux se pedirmos o tema "System" (Falha de Segmentação)
+        if platform.system() == "Linux" and theme_name == "Sistema":
+            theme_name = "Preto"
+
         self.theme_data = THEME_COLORS.get(theme_name, THEME_COLORS["Sistema"])
         ctk.set_appearance_mode(self.theme_data["mode"])
         
