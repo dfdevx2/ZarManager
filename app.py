@@ -19,7 +19,7 @@ from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
-APP_VERSION = "v2.0.1"
+APP_VERSION = "v2.0.2"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -95,10 +95,10 @@ class ZarManagerGUI(ctk.CTk):
         # GESTOR DE CONFIG (PRODUÇÃO VS DESENVOLVIMENTO)
         # ===================================================
         if getattr(sys, 'frozen', False):
-            # 1. MODO COMPILADO (.exe, Flatpak, AppImage): Usa o ficheiro real e guarda no disco
+            # MODO COMPILADO (.exe, Flatpak, AppImage)
             self.cfg = ConfigManager()
         else:
-            # 2. MODO DE TESTE (VS Code/Terminal): Memória volátil. Abre sempre do zero!
+            # MODO DE TESTE (Memória volátil)
             class DevConfig:
                 def __init__(self):
                     self.mem = {"workers": 4, "auto_update": True, "source_dir": "", "target_dir": ""}
@@ -109,12 +109,8 @@ class ZarManagerGUI(ctk.CTk):
                     self.mem[key] = value
             self.cfg = DevConfig()
             print("\n[DEV MODE ATIVO] O ZarManager está a rodar na RAM. Nenhuma config será guardada.\n")
-        
-        if not self.cfg.get("first_boot_done"):
-            self._run_first_boot_setup()
             
         self.title(f"ZarManager {APP_VERSION}")
-        
         self.minsize(950, 650)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -135,8 +131,22 @@ class ZarManagerGUI(ctk.CTk):
         }
         
         self.current_frame_name = "auto"
+        
+        # 1. CONSTRÓI A INTERFACE IMEDIATAMENTE (Segurança contra falhas gráficas)
         self.build_all()
 
+        # 2. LOGICA DE BOAS-VINDAS (Protegida)
+        if not self.cfg.get("first_boot_done"):
+            self.withdraw() # Oculta a janela principal rapidamente
+            # O .after garante que o Toplevel só é criado depois do mainloop começar a rodar!
+            self.after(200, self._run_first_boot_setup)
+        else:
+            self._apply_saved_geometry()
+            
+        self.after(200, self._force_render_refresh)
+        self.after(2000, self.check_for_updates_silently)
+
+    def _apply_saved_geometry(self):
         saved_geometry = self.cfg.get("window_geometry")
         if saved_geometry:
             self.geometry(saved_geometry)
@@ -145,9 +155,6 @@ class ZarManagerGUI(ctk.CTk):
             x = (self.winfo_screenwidth() // 2) - (w // 2)
             y = (self.winfo_screenheight() // 2) - (h // 2)
             self.geometry(f"{w}x{h}+{x}+{y}")
-            
-        self.after(200, self._force_render_refresh)
-        self.after(2000, self.check_for_updates_silently)
 
     def _run_first_boot_setup(self):
         try:
@@ -159,8 +166,6 @@ class ZarManagerGUI(ctk.CTk):
         except:
             self.cfg.set("language", "en")
             
-        self.withdraw()
-        
         setup_win = ctk.CTkToplevel(self)
         setup_win.title("Welcome to ZarManager")
         setup_win.geometry("500x380")
@@ -204,11 +209,14 @@ class ZarManagerGUI(ctk.CTk):
             self.cfg.set("theme", self.temp_theme_var.get())
             self.cfg.set("first_boot_done", True)
             setup_win.destroy()
+            
+            # Reconstrói a interface com o tema escolhido e exibe a aplicação
+            self.refresh_ui()
+            self._apply_saved_geometry()
             self.deiconify()
             
         ctk.CTkButton(setup_win, text="Continuar / Continue", command=on_finish, height=35, font=("Segoe UI", 14, "bold")).pack(pady=20)
-        
-        self.wait_window(setup_win)
+        # O wait_window foi REMOVIDO daqui. É ele quem causava o Segfault na compilação!
 
     def _force_render_refresh(self):
         w = self.winfo_width()
@@ -403,7 +411,6 @@ class ZarManagerGUI(ctk.CTk):
         if c == t and t > 0: self.play_sound("success")
 
     def _update_status(self, m, item, status):
-        # Esta função agora recebe centenas de atualizações do subprocess em tempo real
         if "FALHA" in status.upper(): self.play_sound("error")
         tasks = self.tab_data[m]["active_tasks"]
         frame = self.tab_data[m]["tasks_frame"]
@@ -412,7 +419,6 @@ class ZarManagerGUI(ctk.CTk):
             if item in tasks: tasks.pop(item).destroy()
         else:
             if item not in tasks:
-                # Estilo premium: Fonte maior, negrito e com a cor de destaque do tema
                 lbl = ctk.CTkLabel(frame, text=f"• {item}: {status}", font=("Segoe UI", 13, "bold"), text_color=self.theme_data["accent"])
                 lbl.pack(anchor="w", padx=15, pady=4)
                 tasks[item] = lbl
@@ -535,7 +541,6 @@ class ZarManagerGUI(ctk.CTk):
         self.tab_data[mode]["lbl_percentage"] = ctk.CTkLabel(info_frame, text="0%", font=("", 12, "bold"))
         self.tab_data[mode]["lbl_percentage"].pack(side="right")
 
-        # Barra de progresso grossa e bonita (sem duplicações)
         self.tab_data[mode]["progress"] = ctk.CTkProgressBar(bot_frame, progress_color=self.theme_data["accent"], height=22, corner_radius=8)
         self.tab_data[mode]["progress"].grid(row=2, column=0, sticky="ew", pady=(0, 10))
         self.tab_data[mode]["progress"].set(0)
