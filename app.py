@@ -18,7 +18,7 @@ from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
-APP_VERSION = "v1.3.5"
+APP_VERSION = "v2.0.0"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 

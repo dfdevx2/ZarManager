@@ -1,8 +1,8 @@
-# ZarManager v1.3.5 - The Flatpak & UI Safety Update
+# ZarManager v2.0.0 - The Flatpak & UI Safety Major Update
 
-**ZarManager v1.3.5** focuses on giving users more control over their disk space, fixing minor UI localization bugs, and taking a massive step forward in Linux distribution by introducing experimental Flatpak support.
+**ZarManager v2.0.0** is a major milestone that focuses on giving users more control over their disk space, fixing minor UI localization bugs, and taking a massive step forward in Linux distribution by introducing experimental Flatpak support.
 
-### 🚀 New Features & Enhancements
+### 🚀 Major Features & Enhancements
 
 * **Pre-Operation Safety Prompt:** Added a native dialog box that appears right before a batch process begins. Users can now explicitly choose whether to **Keep** or **Delete** the original source files (ISOs, ZIPs, or extracted folders) after a successful operation, giving you total control over disk space management.
 * **Experimental Flatpak Support:** The CI/CD pipeline now automatically compiles and bundles ZarManager into a standalone `.flatpak` package using the Freedesktop SDK. This provides an alternative, highly sandboxed installation method for Linux users (especially on Arch/CachyOS) who wish to bypass `fuse2` AppImage requirements.
