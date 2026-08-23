@@ -34,7 +34,6 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-22.04
-    # DECLARAÇÃO GLOBAL DE NÃO INTERATIVIDADE PARA O APT-GET
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
@@ -46,7 +45,8 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full fuse libfuse2 desktop-file-utils wget
+          # Adicionamos 'flatpak' e 'flatpak-builder' à lista de instalação
+          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full fuse libfuse2 desktop-file-utils wget flatpak flatpak-builder
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -56,6 +56,7 @@ jobs:
         run: pyinstaller ZarManager.spec
       - name: Create Linux Standard Zip
         run: python -c "import shutil; shutil.make_archive('ZarManager-Linux', 'zip', 'dist/ZarManager')"
+        
       - name: Prepare AppImage Directory
         run: |
           mkdir -p AppDir/usr/bin
@@ -89,6 +90,18 @@ jobs:
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
           ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ZarManager-Linux-x86_64.AppImage
+
+      - name: Build Flatpak Bundle
+        run: |
+          # 1. Adiciona o repositório Flathub para baixar o motor gráfico base
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          
+          # 2. Constrói o Flatpak usando o nosso Manifesto
+          flatpak-builder --repo=repo --force-clean build-dir com.github.dfdevx2.ZarManager.yml
+          
+          # 3. Empacota num ficheiro .flatpak que qualquer pessoa pode instalar com 2 cliques
+          flatpak build-bundle repo ZarManager-Linux-x86_64.flatpak com.github.dfdevx2.ZarManager
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -96,6 +109,7 @@ jobs:
           path: |
             ZarManager-Linux.zip
             ZarManager-Linux-x86_64.AppImage
+            ZarManager-Linux-x86_64.flatpak
 
   create-release:
     needs: [build-windows, build-linux]
@@ -112,5 +126,6 @@ jobs:
             Windows-Build/ZarManager-Windows.zip
             Linux-Build/ZarManager-Linux.zip
             Linux-Build/ZarManager-Linux-x86_64.AppImage
+            Linux-Build/ZarManager-Linux-x86_64.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

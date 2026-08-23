@@ -1,31 +1,22 @@
-# ZarManager v1.3.3 - The Robust Preservation & Multi-Build Update
+# ZarManager v1.3.5 - The Flatpak & UI Safety Update
 
-We are proud to release **ZarManager v1.3.3**, a massive milestone focused on universal cross-platform compatibility, file-system safety, and deep pipeline stability.
+**ZarManager v1.3.5** focuses on giving users more control over their disk space, fixing minor UI localization bugs, and taking a massive step forward in Linux distribution by introducing experimental Flatpak support.
 
-### 🚀 Major Features & Core Improvements
+### 🚀 New Features & Enhancements
 
-* **Universal 7-Zip Pipeline (`.zip`, `.rar`, `.7z`):** Automatically detects compressed ROM archives, applies "flat" extraction logic (`7z e`) to bypass nested subdirectories, extracts the core `.iso` or files, and safely cleans up temporary elements.
-* **Collision Detection Engine:** Intelligent safeguards built into every batch mode. If a destination `.zar` file or extracted folder already exists, ZarManager prompts you to **Overwrite**, **Skip**, or **Cancel**, protecting your existing library.
-* **Background Silent Auto-Updater:** Checks for new GitHub releases asynchronously on startup without freezing the UI. A clean notification prompt appears if an update is found (can be completely toggled off in the *About* tab).
-* **Cross-Platform Audio Feedback:** Integrated auditory notifications (system beeps/chimes) upon successful batch completions or critical pipeline errors, allowing you to run heavy queues unattended.
+* **Pre-Operation Safety Prompt:** Added a native dialog box that appears right before a batch process begins. Users can now explicitly choose whether to **Keep** or **Delete** the original source files (ISOs, ZIPs, or extracted folders) after a successful operation, giving you total control over disk space management.
+* **Experimental Flatpak Support:** The CI/CD pipeline now automatically compiles and bundles ZarManager into a standalone `.flatpak` package using the Freedesktop SDK. This provides an alternative, highly sandboxed installation method for Linux users (especially on Arch/CachyOS) who wish to bypass `fuse2` AppImage requirements.
+* **Dynamic Translation Engine:** The "Performance Warning" message in the Settings tab (regarding CPU threads and I/O bottlenecks) is now fully integrated into the localization engine and will update dynamically when switching between English and Portuguese.
 
-### ⚡ UI Overhaul & Performance
+### 🛠️ Bug Fixes
 
-* **C-Native Treeview Rendering (Zero Lag):** Replaced legacy listboxes with a high-performance `Treeview`. Capable of rendering thousands of items instantly with custom row-height spacing and smooth scrolling.
-* **New "AMOLED Purple" Theme:** Replaced standard dark mode with an absolute pure-black (`#000000`) background accented by vibrant purple highlights, tailored for OLED screens and modern aesthetics.
-* **Linux Window State Fix:** Resolved the Wayland/X11 initial render collapse bug using an automated geometry-refresh protocol on startup.
+* **Phantom Update Loop Fixed:** Resolved an issue where the internal version tracker was outdated, causing the background auto-updater to falsely prompt users to download a new release on startup even if they were on the latest version.
+* **Core Execution Cleanup:** Safely bypassed the `os.remove()` and `shutil.rmtree()` commands deep within the core processing loop whenever the user elects to keep original files, preventing accidental data loss on large libraries.
 
-### 🐧 Linux & AppImage Fixes (v1.3.3)
+### 📦 Distribution 
 
-* **Read-Only File System Fix:** Fixed a critical crash on AppImages where the internal configuration (`settings.json`) attempted to write inside the read-only mounted path (`/tmp/...`). Configurations are now dynamically routed to the user's secure profile directory (`~/.config/zarmanager/settings.json`), keeping the application fully compliant with strict sandbox environments.
-* **Multi-Format Distribution:** Every release now automatically generates and publishes **3 distinct binaries**:
-  1. `ZarManager-Windows.zip` (Portable Windows Build)
-  2. `ZarManager-Linux.zip` (Standard Linux Directory Build)
-  3. `ZarManager-Linux-x86_64.AppImage` (Universal Portable Linux Executable)
-
-### 🛠️ Dedicated Workflow Tabs
-
-1. **Automated Pipeline (Full):** Drag-and-drop any combination of archives, ISOs, or folders. Automatically decompresses, extracts XISO, compresses to `.zar`, and cleans up.
-2. **Extract Archives Only:** Isated tool for unpacking `.zip`, `.rar`, or `.7z` archives flatly.
-3. **Extract ISO Only:** Unpacks raw XDVDFS structures from standard Xbox 360 `.iso` images.
-4. **Compress Only:** Compresses structured game directories directly into high-efficiency `.zar` files.
+Every release now generates **4 official binaries**:
+1. `ZarManager-Windows.zip` (Portable Windows Build)
+2. `ZarManager-Linux.zip` (Standard Linux Directory Build)
+3. `ZarManager-Linux-x86_64.AppImage` (Universal Portable Linux Executable)
+4. `ZarManager-Linux-x86_64.flatpak` (Experimental Flatpak Bundle)
