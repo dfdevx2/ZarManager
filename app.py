@@ -51,6 +51,9 @@ class ToolTip:
     def show(self):
         self.unschedule()
         if not self.tooltip_window:
+            # BLINDAGEM LINUX WAYLAND: Impedir que popups causem SIGSEGV ao passar o rato
+            if platform.system() == "Linux": return 
+            
             x, y, cx, cy = self.widget.bbox("insert")
             x = x + self.widget.winfo_rootx() + 25
             y = y + cy + self.widget.winfo_rooty() + 25
@@ -86,11 +89,8 @@ class ZarManagerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        if platform.system() == "Linux":
-            ctk.set_window_scaling(1.1)
-            ctk.set_widget_scaling(1.1)
+        # REMOVIDO: O set_window_scaling do Linux foi FINALMENTE APAGADO DAQUI!
             
-        # APENAS CÓDIGO DE PRODUÇÃO SEGURO
         self.cfg = ConfigManager()
             
         self.title(f"ZarManager {APP_VERSION}")
@@ -115,14 +115,12 @@ class ZarManagerGUI(ctk.CTk):
         
         self.current_frame_name = "auto"
         
-        # SÓ CONSTRÓI AS INTERFACES DEPOIS DA BASE ESTAR PRONTA (Evita falhas de segmentação)
         if not self.cfg.get("first_boot_done"):
             self._build_first_boot_ui()
         else:
             self.build_all()
             self._apply_saved_geometry()
             
-            # PREVENÇÃO DE WAYLAND GLITCH: Updates forçados de janela só rodam no Windows
             if platform.system() == "Windows":
                 self.after(200, self._force_render_refresh)
             self.after(2000, self.check_for_updates_silently)
@@ -132,15 +130,12 @@ class ZarManagerGUI(ctk.CTk):
         if saved_geometry:
             self.geometry(saved_geometry)
         else:
-            # 100% SEGURO NO LINUX: Sem chamar matemáticas de ecrã antes dele mapear
             self.geometry("1200x800")
 
     def _build_first_boot_ui(self):
-        # 100% SEGURO: Usar variáveis de ambiente básicas em vez do módulo C 'locale' (Garante o suporte AppImage)
         sys_lang = os.environ.get("LANG", "en").lower()
         self.cfg.set("language", "pt-br" if "pt" in sys_lang else "en")
             
-        # BLINDAGEM LINUX DBUS: Previne Falha de Segmentação forçando o Dark Mode inicial
         if not self.cfg.get("theme"):
             self.cfg.set("theme", "Preto" if platform.system() == "Linux" else "Sistema")
             
@@ -188,13 +183,14 @@ class ZarManagerGUI(ctk.CTk):
             self.cfg.set("theme", self.temp_theme_var.get())
             self.cfg.set("first_boot_done", True)
             
-            # Limpa o ecrã de setup em segurança e invoca a aplicação completa
-            setup_frame.destroy()
-            self.build_all()
-            
-            if platform.system() == "Windows":
-                self.after(200, self._force_render_refresh)
-            self.after(2000, self.check_for_updates_silently)
+            def transition():
+                setup_frame.destroy()
+                self.build_all()
+                if platform.system() == "Windows":
+                    self.after(200, self._force_render_refresh)
+                self.after(2000, self.check_for_updates_silently)
+                
+            self.after(100, transition)
             
         ctk.CTkButton(center, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
 
@@ -244,7 +240,6 @@ class ZarManagerGUI(ctk.CTk):
     def apply_appearance(self):
         theme_name = self.cfg.get("theme")
         
-        # BLINDAGEM DBUS: AppImages crasham no Linux se pedirmos o tema "System" (Falha de Segmentação)
         if platform.system() == "Linux" and theme_name == "Sistema":
             theme_name = "Preto"
 
@@ -572,7 +567,6 @@ class ZarManagerGUI(ctk.CTk):
     def on_setting_change(self, choice):
         self.cfg.set("language", self.lang_var.get())
         self.cfg.set("theme", self.theme_var.get())
-        # PROTEÇÃO SIGSEGV: Espera que a animação da combobox termine antes de vaporizar a interface
         self.after(150, self.refresh_ui)
 
     def on_auto_update_change(self):
@@ -671,6 +665,17 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_error(self, err):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text="Falha de rede.", text_color="red")
+
+    def select_frame_by_name(self, name: str):
+        self.current_frame_name = name
+        for btn_name, btn in self.btns.items():
+            btn.configure(fg_color=self.theme_data["accent"] if btn_name == name else "transparent", 
+                          text_color="white" if btn_name == name else self.theme_data["text"])
+        self.frames[name].tkraise()
+        
+        if name in ["auto", "extract_arc", "extract", "compress"]:
+            if not self.tab_data[name]["items"] and self.cfg.get("source_dir"):
+                self.populate_file_list(name, self.cfg.get("source_dir"))
 
 if __name__ == "__main__":
     app = ZarManagerGUI()
