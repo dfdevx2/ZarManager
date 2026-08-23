@@ -16,15 +16,12 @@ modules:
   - name: zarmanager
     buildsystem: simple
     build-commands:
-      # Binários do programa
       - mkdir -p /app/bin
       - cp -r dist/ZarManager/* /app/bin/
       - chmod +x /app/bin/ZarManager
-      
-      # Metadados de Sistema (Para aparecer no Menu Iniciar e na Loja Discover)
       - install -Dm644 com.github.dfdevx2.ZarManager.desktop /app/share/applications/com.github.dfdevx2.ZarManager.desktop
       - install -Dm644 com.github.dfdevx2.ZarManager.metainfo.xml /app/share/metainfo/com.github.dfdevx2.ZarManager.metainfo.xml
-      - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/com.github.dfdevx2.ZarManager.png
+      - install -Dm644 icon.png /app/share/icons/hicolor/512x512/apps/com.github.dfdevx2.ZarManager.png
     sources:
       - type: dir
         path: .

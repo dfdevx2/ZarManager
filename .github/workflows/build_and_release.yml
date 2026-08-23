@@ -45,7 +45,6 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
-          # Adicionado imagemagick para converter o ícone
           sudo apt-get install -y --no-install-recommends python3-tk p7zip-full libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder imagemagick
       - name: Install Python Dependencies
         run: |
@@ -75,6 +74,8 @@ jobs:
           
           if [ -f img/icon.png ]; then
             cp img/icon.png AppDir/ZarManager.png
+          elif [ -f img/logo.png ]; then
+            cp img/logo.png AppDir/ZarManager.png
           elif [ -f img/icon.ico ]; then
             cp img/icon.ico AppDir/ZarManager.png
           else
@@ -95,7 +96,6 @@ jobs:
 
       - name: Build Flatpak Bundle
         run: |
-          # 0. Gera os metadados dinamicamente para a Loja
           cat <<EOF > com.github.dfdevx2.ZarManager.desktop
           [Desktop Entry]
           Version=1.0
@@ -121,24 +121,24 @@ jobs:
             </description>
             <launchable type="desktop-id">com.github.dfdevx2.ZarManager.desktop</launchable>
             <url type="homepage">https://github.com/dfdevx2/ZarManager</url>
-            <developer_name>dfdevx2</developer_name>
-            <update_contact>dfdevx2@github.com</update_contact>
+            <developer id="github.com/dfdevx2">
+              <name>dfdevx2</name>
+            </developer>
           </component>
           EOF
           
-          # Copia o ícone de alta resolução diretamente
-          convert img/icon.png -resize 256x256 icon.png || touch icon.png
+          if [ -f img/icon.png ]; then
+            convert img/icon.png -resize 512x512 icon.png
+          elif [ -f img/logo.png ]; then
+            convert img/logo.png -resize 512x512 icon.png
+          else
+            touch icon.png
+          fi
           
-          # 1. Adiciona o repositório Flathub
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          
-          # 2. Instalação do SDK e Plataforma
           sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
           
-          # 3. Constrói o Flatpak
           flatpak-builder --repo=repo --force-clean build-dir com.github.dfdevx2.ZarManager.yml
-          
-          # 4. Empacota num ficheiro .flatpak 
           flatpak build-bundle repo ZarManager-Linux-x86_64.flatpak com.github.dfdevx2.ZarManager
 
       - name: Upload Artifacts
