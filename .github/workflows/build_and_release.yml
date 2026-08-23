@@ -45,7 +45,6 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
-          # Adicionado imagemagick para converter o ícone
           sudo apt-get install -y --no-install-recommends python3-tk p7zip-full libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder imagemagick
       - name: Install Python Dependencies
         run: |
@@ -73,7 +72,9 @@ jobs:
           Terminal=false
           EOF
           
-          if [ -f img/icon.ico ]; then
+          if [ -f img/icon.png ]; then
+            cp img/icon.png AppDir/ZarManager.png
+          elif [ -f img/icon.ico ]; then
             cp img/icon.ico AppDir/ZarManager.png
           else
             touch AppDir/ZarManager.png
@@ -124,8 +125,8 @@ jobs:
           </component>
           EOF
           
-          # Converte o ícone ICO em PNG para o Flatpak
-          convert img/icon.ico -resize 256x256 icon.png || touch icon.png
+          # Copia o ícone de alta resolução diretamente
+          cp img/icon.png icon.png || touch icon.png
           
           # 1. Adiciona o repositório Flathub
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
