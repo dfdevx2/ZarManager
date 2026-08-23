@@ -95,10 +95,8 @@ class ZarManagerGUI(ctk.CTk):
         # GESTOR DE CONFIG (PRODUÇÃO VS DESENVOLVIMENTO)
         # ===================================================
         if getattr(sys, 'frozen', False):
-            # MODO COMPILADO (.exe, Flatpak, AppImage)
             self.cfg = ConfigManager()
         else:
-            # MODO DE TESTE (Memória volátil)
             class DevConfig:
                 def __init__(self):
                     self.mem = {"workers": 4, "auto_update": True, "source_dir": "", "target_dir": ""}
@@ -109,6 +107,17 @@ class ZarManagerGUI(ctk.CTk):
                     self.mem[key] = value
             self.cfg = DevConfig()
             print("\n[DEV MODE ATIVO] O ZarManager está a rodar na RAM. Nenhuma config será guardada.\n")
+            
+        # 1. INJEÇÃO DE SOBREVIVÊNCIA (IMPEDE O CRASH FATAL)
+        if not self.cfg.get("language"):
+            try:
+                sys_lang = locale.getdefaultlocale()[0] or "en"
+                self.cfg.set("language", "pt-br" if sys_lang.lower().startswith("pt") else "en")
+            except:
+                self.cfg.set("language", "en")
+                
+        if not self.cfg.get("theme"):
+            self.cfg.set("theme", "Sistema")
             
         self.title(f"ZarManager {APP_VERSION}")
         self.minsize(950, 650)
@@ -132,13 +141,12 @@ class ZarManagerGUI(ctk.CTk):
         
         self.current_frame_name = "auto"
         
-        # 1. CONSTRÓI A INTERFACE IMEDIATAMENTE (Segurança contra falhas gráficas)
+        # 2. CONSTRÓI A INTERFACE EM SEGURANÇA (Agora o idioma existe!)
         self.build_all()
 
-        # 2. LOGICA DE BOAS-VINDAS (Protegida)
+        # 3. LÓGICA DE BOAS-VINDAS
         if not self.cfg.get("first_boot_done"):
-            self.withdraw() # Oculta a janela principal rapidamente
-            # O .after garante que o Toplevel só é criado depois do mainloop começar a rodar!
+            self.withdraw()
             self.after(200, self._run_first_boot_setup)
         else:
             self._apply_saved_geometry()
@@ -157,15 +165,6 @@ class ZarManagerGUI(ctk.CTk):
             self.geometry(f"{w}x{h}+{x}+{y}")
 
     def _run_first_boot_setup(self):
-        try:
-            sys_lang = locale.getdefaultlocale()[0] or "en"
-            if sys_lang.lower().startswith("pt"):
-                self.cfg.set("language", "pt-br")
-            else:
-                self.cfg.set("language", "en")
-        except:
-            self.cfg.set("language", "en")
-            
         setup_win = ctk.CTkToplevel(self)
         setup_win.title("Welcome to ZarManager")
         setup_win.geometry("500x380")
@@ -180,7 +179,7 @@ class ZarManagerGUI(ctk.CTk):
         ctk.CTkLabel(setup_win, text="Bem-vindo / Welcome", font=("Segoe UI", 26, "bold")).pack(pady=(25, 5))
         ctk.CTkLabel(setup_win, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 14)).pack(pady=(0, 20))
         
-        self.temp_theme_var = ctk.StringVar(value="Sistema")
+        self.temp_theme_var = ctk.StringVar(value=self.cfg.get("theme"))
         
         themes_frame = ctk.CTkFrame(setup_win, fg_color="transparent")
         themes_frame.pack(pady=5, fill="both", expand=True, padx=30)
@@ -210,13 +209,11 @@ class ZarManagerGUI(ctk.CTk):
             self.cfg.set("first_boot_done", True)
             setup_win.destroy()
             
-            # Reconstrói a interface com o tema escolhido e exibe a aplicação
             self.refresh_ui()
             self._apply_saved_geometry()
             self.deiconify()
             
         ctk.CTkButton(setup_win, text="Continuar / Continue", command=on_finish, height=35, font=("Segoe UI", 14, "bold")).pack(pady=20)
-        # O wait_window foi REMOVIDO daqui. É ele quem causava o Segfault na compilação!
 
     def _force_render_refresh(self):
         w = self.winfo_width()
