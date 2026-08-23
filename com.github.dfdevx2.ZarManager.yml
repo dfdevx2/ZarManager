@@ -3,23 +3,23 @@ runtime: org.freedesktop.Platform
 runtime-version: '23.08'
 sdk: org.freedesktop.Sdk
 command: ZarManager
+# DESATIVA A OTIMIZAÇÃO E COMPRESSÃO DE BINÁRIOS
+build-options:
+  strip: false
+  no-debuginfo: true
 finish-args:
-  # Permissões Gráficas
   - --socket=x11
   - --socket=wayland
   - --share=ipc
   - --device=dri
-  # Permissão Crítica: Permite ao ZarManager ler os jogos em qualquer disco
   - --filesystem=host
 modules:
   - name: zarmanager
     buildsystem: simple
     build-commands:
-      # Pega na pasta criada pelo PyInstaller e atira-a para dentro do Flatpak
       - mkdir -p /app/bin
       - cp -r dist/ZarManager/* /app/bin/
       - chmod +x /app/bin/ZarManager
     sources:
-      # Diz ao Flatpak para procurar os ficheiros na diretoria atual
       - type: dir
         path: .
