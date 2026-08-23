@@ -45,7 +45,8 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full fuse libfuse2 desktop-file-utils wget flatpak flatpak-builder
+          # AQUI ESTÁ A MÁGICA: libfuse2 (AppImage) + fuse3 (Flatpak) convivendo em paz!
+          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -95,7 +96,7 @@ jobs:
           # 1. Adiciona o repositório Flathub globalmente
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           
-          # 2. Instalação forçada do SDK e da Plataforma para resolver o erro
+          # 2. Instalação forçada do SDK e da Plataforma
           sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
           
           # 3. Constrói o Flatpak usando o nosso Manifesto
