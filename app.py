@@ -12,7 +12,6 @@ import json
 import platform
 import ssl
 import subprocess
-import locale
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from config import ConfigManager
@@ -130,13 +129,15 @@ class ZarManagerGUI(ctk.CTk):
         
         self.current_frame_name = "auto"
         
-        # O SISTEMA DE ARRANQUE À PROVA DE SEGFAULTS
+        # SÓ CONSTRÓI AS INTERFACES DEPOIS DA BASE ESTAR PRONTA
         if not self.cfg.get("first_boot_done"):
             self._build_first_boot_ui()
         else:
             self.build_all()
             self._apply_saved_geometry()
-            self.after(200, self._force_render_refresh)
+            
+            if platform.system() == "Windows":
+                self.after(200, self._force_render_refresh)
             self.after(2000, self.check_for_updates_silently)
 
     def _apply_saved_geometry(self):
@@ -144,18 +145,13 @@ class ZarManagerGUI(ctk.CTk):
         if saved_geometry:
             self.geometry(saved_geometry)
         else:
-            w, h = 1200, 800
-            x = (self.winfo_screenwidth() // 2) - (w // 2)
-            y = (self.winfo_screenheight() // 2) - (h // 2)
-            self.geometry(f"{w}x{h}+{x}+{y}")
+            # 100% SEGURO NO LINUX: Sem chamar winfo_screenwidth antes do ecrã mapear!
+            self.geometry("1200x800")
 
     def _build_first_boot_ui(self):
-        """Constrói a interface de Boas-vindas DENTRO da janela principal. Sem Toplevels, sem Segfaults."""
-        try:
-            sys_lang = locale.getdefaultlocale()[0] or "en"
-            self.cfg.set("language", "pt-br" if sys_lang.lower().startswith("pt") else "en")
-        except:
-            self.cfg.set("language", "en")
+        # 100% SEGURO: Sem usar o pacote 'locale' do Python que entra em conflito com o AppImage.
+        sys_lang = os.environ.get("LANG", "en").lower()
+        self.cfg.set("language", "pt-br" if "pt" in sys_lang else "en")
             
         if not self.cfg.get("theme"):
             self.cfg.set("theme", "Sistema")
@@ -163,14 +159,21 @@ class ZarManagerGUI(ctk.CTk):
         self._apply_saved_geometry()
         
         setup_frame = ctk.CTkFrame(self, fg_color="transparent")
-        setup_frame.grid(row=0, column=0, columnspan=2)
+        setup_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         
-        ctk.CTkLabel(setup_frame, text="Bem-vindo / Welcome", font=("Segoe UI", 36, "bold")).pack(pady=(0, 10))
-        ctk.CTkLabel(setup_frame, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 16)).pack(pady=(0, 40))
+        setup_frame.grid_rowconfigure(0, weight=1)
+        setup_frame.grid_rowconfigure(5, weight=1)
+        setup_frame.grid_columnconfigure(0, weight=1)
+        
+        center = ctk.CTkFrame(setup_frame, fg_color="transparent")
+        center.grid(row=1, column=0)
+        
+        ctk.CTkLabel(center, text="Bem-vindo / Welcome", font=("Segoe UI", 36, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(center, text="Escolha o tema inicial / Choose a starting theme:", font=("Segoe UI", 16)).pack(pady=(0, 40))
         
         self.temp_theme_var = ctk.StringVar(value=self.cfg.get("theme"))
         
-        themes_frame = ctk.CTkFrame(setup_frame, fg_color="transparent")
+        themes_frame = ctk.CTkFrame(center, fg_color="transparent")
         themes_frame.pack(pady=5)
         
         row, col = 0, 0
@@ -197,18 +200,18 @@ class ZarManagerGUI(ctk.CTk):
             self.cfg.set("theme", self.temp_theme_var.get())
             self.cfg.set("first_boot_done", True)
             
-            # Destrói o ecrã de setup e constrói a aplicação no mesmo canvas
-            for widget in self.winfo_children():
-                widget.destroy()
-                
+            # Limpa o ecrã de setup em segurança e invoca a aplicação completa
+            setup_frame.destroy()
             self.build_all()
-            self._apply_saved_geometry()
-            self.after(200, self._force_render_refresh)
+            
+            if platform.system() == "Windows":
+                self.after(200, self._force_render_refresh)
             self.after(2000, self.check_for_updates_silently)
             
-        ctk.CTkButton(setup_frame, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
+        ctk.CTkButton(center, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
 
     def _force_render_refresh(self):
+        if platform.system() == "Linux": return # Previne glitches de Wayland/X11
         w = self.winfo_width()
         h = self.winfo_height()
         if w > 100 and h > 100:
