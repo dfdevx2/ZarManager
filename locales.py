@@ -33,6 +33,10 @@ TRANSLATIONS = {
         "msg_update_popup_title": "Nova Versão Disponível",
         "msg_update_popup_desc": "A versão {} do ZarManager foi lançada!\n\nDeseja abrir o navegador para baixar a atualização agora?",
 
+        "delete_title": "Manter Arquivos Originais?",
+        "delete_msg": "Por padrão, a ferramenta deleta os arquivos de origem (ISOs, ZIPs, Pastas) após o sucesso da operação para economizar espaço.\n\nDeseja MANTER os arquivos originais no disco?\n\n• Sim: Manter arquivos originais e extraídos\n• Não: Apagar arquivos (Padrão)",
+        "worker_warning": "Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.",
+
         "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até o final (.zar) e limpa os resíduos.",
         "tip_extract_arc": "Isolado: Extrai .zip, .rar ou .7z de forma plana (sem pastas aninhadas).",
         "tip_extract": "Isolado: Extrai os arquivos da ISO (XDVDFS) para uma pasta.",
@@ -74,6 +78,10 @@ TRANSLATIONS = {
         "msg_queue_empty": "All conflicting items were skipped. Queue empty.",
         "msg_update_popup_title": "New Version Available",
         "msg_update_popup_desc": "Version {} released!\n\nOpen browser to download?",
+
+        "delete_title": "Keep Original Files?",
+        "delete_msg": "By default, the tool deletes source files (ISOs, ZIPs, Folders) after a successful operation to save space.\n\nDo you want to KEEP the original files on disk?\n\n• Yes: Keep originals and extracted\n• No: Delete files (Default)",
+        "worker_warning": "Performance Warning: Allocating an excessive number of threads can cause severe disk overload (I/O Bottleneck), \nresulting in a dramatic loss of speed. It is ideal to keep a moderate value (2 to 4) for hard drives.",
 
         "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar.",
         "tip_extract_arc": "Isolated: Extracts archives flatly (no nested folders).",

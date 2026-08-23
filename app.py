@@ -18,7 +18,7 @@ from config import ConfigManager
 import locales
 from core import ZarManagerCore
 
-APP_VERSION = "v1.2.5"
+APP_VERSION = "v1.3.5"
 GITHUB_REPO_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
 GITHUB_REPO_URL = "https://github.com/dfdevx2/ZarManager"
 
@@ -72,7 +72,7 @@ class ToolTip:
             self.tooltip_window = None
 
 # ==========================================
-# NOVO TEMA: AMOLED ROXO
+# TEMA: AMOLED ROXO E OUTROS
 # ==========================================
 THEME_COLORS = {
     "Sistema": {"mode": "System", "sidebar": ("gray85", "gray17"), "accent": ("#3B8ED0", "#1F6AA5"), "hover": ("#36719F", "#144870"), "text": ("black", "white")},
@@ -174,7 +174,6 @@ class ZarManagerGUI(ctk.CTk):
         self.theme_data = THEME_COLORS.get(theme_name, THEME_COLORS["Sistema"])
         ctk.set_appearance_mode(self.theme_data["mode"])
         
-        # Ajuste de fundo se for o tema AMOLED
         bg_col = "#000000" if theme_name == "Preto" else ("#1a1a1a" if ctk.get_appearance_mode() == "Dark" else "#fcfcfc")
         fg_col = "white" if ctk.get_appearance_mode() == "Dark" else "black"
         
@@ -286,17 +285,23 @@ class ZarManagerGUI(ctk.CTk):
                 if not selected_items: return self.log_message("[AVISO] Fila vazia após pular conflitos.")
                 self.log_message(f"[AVISO] Pulando {len(collisions)} itens.")
 
+        # CAIXA DE DIÁLOGO DE DELEÇÃO/MANUTENÇÃO DE ARQUIVOS
+        keep_originals = messagebox.askyesno(
+            title=self.get_text("delete_title"), 
+            message=self.get_text("delete_msg")
+        )
+
         self.tab_data[mode]["btns"]["start"].configure(state="disabled")
         self.tab_data[mode]["btns"]["pause"].configure(state="normal", text="Pausar Fila")
         self.tab_data[mode]["btns"]["cancel"].configure(state="normal")
         self.tab_data[mode]["progress"].set(0)
         self.tab_data[mode]["lbl_percentage"].configure(text="0%")
-        self.log_message(f"[SISTEMA] Lote ({mode.upper()}) iniciado.")
+        self.log_message(f"[SISTEMA] Lote ({mode.upper()}) iniciado. Manter originais: {keep_originals}")
         
-        threading.Thread(target=self._run_core_logic, args=(selected_items, target, self.cfg.get("workers"), mode), daemon=True).start()
+        threading.Thread(target=self._run_core_logic, args=(selected_items, target, self.cfg.get("workers"), mode, keep_originals), daemon=True).start()
 
-    def _run_core_logic(self, items, target, workers, mode):
-        manager = ZarManagerCore(items, target, workers, mode, lambda m: self.after(0, self.log_message, m),
+    def _run_core_logic(self, items, target, workers, mode, keep_originals):
+        manager = ZarManagerCore(items, target, workers, mode, keep_originals, lambda m: self.after(0, self.log_message, m),
                                  lambda c, t, r: self.after(0, self._update_prog, mode, c, t, r),
                                  lambda i, s: self.after(0, self._update_status, mode, i, s))
         self.tab_data[mode]["core_instance"] = manager
@@ -397,7 +402,6 @@ class ZarManagerGUI(ctk.CTk):
         sel_frame = ctk.CTkFrame(frame, fg_color="transparent")
         sel_frame.grid(row=2, column=0, sticky="nsew", padx=30, pady=5)
         
-        # CORREÇÃO MATEMÁTICA DEFINITIVA PARA A LISTA
         sel_frame.grid_rowconfigure(2, weight=1)
         sel_frame.grid_columnconfigure(0, weight=1)
 
@@ -416,7 +420,6 @@ class ZarManagerGUI(ctk.CTk):
         ctk.CTkLabel(sel_frame, text="Itens Identificados:", font=("", 12, "bold")).grid(row=1, column=0, sticky="sw", pady=(0,5))
         ctk.CTkButton(sel_frame, text="Inverter Seleção", width=120, fg_color="gray", command=lambda: self.toggle_all_selections(mode)).grid(row=1, column=1, sticky="se", pady=(0,5))
         
-        # INJEÇÃO ESTRITA DA LISTA USANDO GRID PURO
         lb_frame = ctk.CTkFrame(sel_frame)
         lb_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
         lb_frame.grid_rowconfigure(0, weight=1)
@@ -477,7 +480,8 @@ class ZarManagerGUI(ctk.CTk):
         slider.set(self.cfg.get("workers"))
         slider.pack(anchor="w", padx=30, pady=5)
         
-        ctk.CTkLabel(frame, text="Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), \nresultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.", text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(20, 20))
+        # TEXTO DE AVISO AGORA DINÂMICO CONFORME O IDIOMA
+        ctk.CTkLabel(frame, text=self.get_text("worker_warning"), text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(20, 20))
 
     def _populate_about_frame(self, frame):
         ctk.CTkLabel(frame, text=self.get_text("about_title"), font=("", 24, "bold")).pack(anchor="w", padx=30, pady=30)

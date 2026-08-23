@@ -1,3 +1,5 @@
+# core.py
+
 import sys
 import subprocess
 import threading
@@ -7,11 +9,12 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 class ZarManagerCore:
-    def __init__(self, selected_items, target_directory, max_workers, mode, log_callback, progress_callback, status_callback):
+    def __init__(self, selected_items, target_directory, max_workers, mode, keep_originals, log_callback, progress_callback, status_callback):
         self.items = [Path(p) for p in selected_items]
         self.target_dir = Path(target_directory)
         self.max_workers = max_workers
         self.mode = mode
+        self.keep_originals = keep_originals
         self.log = log_callback
         self.progress_cb = progress_callback
         self.status_cb = status_callback
@@ -102,7 +105,6 @@ class ZarManagerCore:
             if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
                 self.status_cb(original_name, "DESCOMPACTANDO...")
                 
-                # MUDANÇA AQUI: 'e' garante que não haverá pastas dentro de pastas
                 temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
                 cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
                 self._run_cmd(cmd)
@@ -115,14 +117,15 @@ class ZarManagerCore:
                     current_path = target_file
                 else:
                     extracted_folder = self.target_dir / current_path.stem
-                    # Como foi extraído plano, movemos a pasta temp renomeada
                     shutil.move(str(temp_extract_dir), str(extracted_folder))
                     current_path = extracted_folder
                 
                 shutil.rmtree(temp_extract_dir, ignore_errors=True)
                 
-                try: item_path.unlink() # Apaga RAR
-                except: pass
+                # SÓ APAGA O RAR/ZIP ORIGINAL SE NÃO FOR PARA MANTER
+                if not self.keep_originals:
+                    try: item_path.unlink()
+                    except: pass
                 
                 if self.mode == 'extract_arc':
                     self._finalize_item(original_name, "CONCLUIDO")
@@ -141,8 +144,12 @@ class ZarManagerCore:
                 self._run_cmd(cmd)
                 
                 extracted_folder = self.target_dir / current_path.stem
-                try: current_path.unlink() 
-                except: pass
+                
+                # SÓ APAGA A ISO ORIGINAL SE NÃO FOR PARA MANTER
+                if not self.keep_originals:
+                    try: current_path.unlink() 
+                    except: pass
+                    
                 current_path = extracted_folder
                 
                 if self.mode == 'extract':
@@ -157,7 +164,9 @@ class ZarManagerCore:
                 cmd = [str(self.zar_bin), str(zar_output), str(current_path)]
                 self._run_cmd(cmd)
                 
-                shutil.rmtree(current_path, ignore_errors=True)
+                # SÓ APAGA A PASTA EXTRAÍDA SE NÃO FOR PARA MANTER
+                if not self.keep_originals:
+                    shutil.rmtree(current_path, ignore_errors=True)
                 
             self._finalize_item(original_name, "CONCLUIDO")
 
