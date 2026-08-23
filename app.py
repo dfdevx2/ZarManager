@@ -86,7 +86,11 @@ class ZarManagerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        # APENAS CÓDIGO DE PRODUÇÃO (MODO DEV FOI ANIQUILADO)
+        if platform.system() == "Linux":
+            ctk.set_window_scaling(1.1)
+            ctk.set_widget_scaling(1.1)
+            
+        # APENAS CÓDIGO DE PRODUÇÃO SEGURO
         self.cfg = ConfigManager()
             
         self.title(f"ZarManager {APP_VERSION}")
@@ -111,7 +115,7 @@ class ZarManagerGUI(ctk.CTk):
         
         self.current_frame_name = "auto"
         
-        # SÓ CONSTRÓI AS INTERFACES DEPOIS DA BASE ESTAR PRONTA
+        # SÓ CONSTRÓI AS INTERFACES DEPOIS DA BASE ESTAR PRONTA (Evita falhas de segmentação)
         if not self.cfg.get("first_boot_done"):
             self._build_first_boot_ui()
         else:
@@ -132,7 +136,7 @@ class ZarManagerGUI(ctk.CTk):
             self.geometry("1200x800")
 
     def _build_first_boot_ui(self):
-        # 100% SEGURO: Usar variáveis de ambiente básicas em vez do módulo C 'locale'
+        # 100% SEGURO: Usar variáveis de ambiente básicas em vez do módulo C 'locale' (Garante o suporte AppImage)
         sys_lang = os.environ.get("LANG", "en").lower()
         self.cfg.set("language", "pt-br" if "pt" in sys_lang else "en")
             
@@ -195,6 +199,7 @@ class ZarManagerGUI(ctk.CTk):
         ctk.CTkButton(center, text="Continuar / Continue", command=on_finish, height=45, font=("Segoe UI", 16, "bold")).pack(pady=40)
 
     def _force_render_refresh(self):
+        if platform.system() == "Linux": return 
         w = self.winfo_width()
         h = self.winfo_height()
         if w > 100 and h > 100:
@@ -547,12 +552,31 @@ class ZarManagerGUI(ctk.CTk):
         self.theme_var = ctk.StringVar(value=self.cfg.get("theme"))
         ctk.CTkComboBox(frame, variable=self.theme_var, values=["Sistema", "Preto", "Branco", "Steam", "Xbox"], command=self.on_setting_change).pack(anchor="w", padx=30, pady=10)
 
-        ctk.CTkLabel(frame, text=f'{self.get_text("lbl_workers")} (Atual: {self.cfg.get("workers")})').pack(anchor="w", padx=30, pady=(10, 0))
+        workers_val = int(self.cfg.get("workers") or 1)
+        
+        self.lbl_workers_var = ctk.StringVar(value=f'{self.get_text("lbl_workers")} (Atual: {workers_val})')
+        ctk.CTkLabel(frame, textvariable=self.lbl_workers_var).pack(anchor="w", padx=30, pady=(10, 0))
+        
         slider = ctk.CTkSlider(frame, from_=1, to=16, number_of_steps=15, command=self.on_worker_slider_change)
-        slider.set(self.cfg.get("workers"))
+        slider.set(workers_val)
         slider.pack(anchor="w", padx=30, pady=5)
         
         ctk.CTkLabel(frame, text=self.get_text("worker_warning"), text_color="orange", justify="left").pack(anchor="w", padx=30, pady=(20, 20))
+
+    def on_worker_slider_change(self, value):
+        val = int(value)
+        self.cfg.set("workers", val)
+        if hasattr(self, 'lbl_workers_var'):
+            self.lbl_workers_var.set(f'{self.get_text("lbl_workers")} (Atual: {val})')
+
+    def on_setting_change(self, choice):
+        self.cfg.set("language", self.lang_var.get())
+        self.cfg.set("theme", self.theme_var.get())
+        # PROTEÇÃO SIGSEGV: Espera que a animação da combobox termine antes de vaporizar a interface
+        self.after(150, self.refresh_ui)
+
+    def on_auto_update_change(self):
+        self.cfg.set("auto_update", self.auto_update_var.get())
 
     def _populate_about_frame(self, frame):
         frame.grid_rowconfigure(0, weight=1)
@@ -647,28 +671,6 @@ class ZarManagerGUI(ctk.CTk):
     def _update_ui_update_error(self, err):
         self.btn_check_update.configure(state="normal")
         self.lbl_update_status.configure(text="Falha de rede.", text_color="red")
-
-    def select_frame_by_name(self, name: str):
-        self.current_frame_name = name
-        for btn_name, btn in self.btns.items():
-            btn.configure(fg_color=self.theme_data["accent"] if btn_name == name else "transparent", 
-                          text_color="white" if btn_name == name else self.theme_data["text"])
-        self.frames[name].tkraise()
-        
-        if name in ["auto", "extract_arc", "extract", "compress"]:
-            if not self.tab_data[name]["items"] and self.cfg.get("source_dir"):
-                self.populate_file_list(name, self.cfg.get("source_dir"))
-
-    def on_setting_change(self, choice):
-        self.cfg.set("language", self.lang_var.get())
-        self.cfg.set("theme", self.theme_var.get())
-        self.refresh_ui()
-
-    def on_worker_slider_change(self, value):
-        self.cfg.set("workers", int(value))
-
-    def on_auto_update_change(self):
-        self.cfg.set("auto_update", self.auto_update_var.get())
 
 if __name__ == "__main__":
     app = ZarManagerGUI()
