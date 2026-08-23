@@ -45,8 +45,8 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
-          # AQUI ESTÁ A MÁGICA: libfuse2 (AppImage) + fuse3 (Flatpak) convivendo em paz!
-          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder
+          # Adicionado imagemagick para converter o ícone
+          sudo apt-get install -y --no-install-recommends python3-tk p7zip-full libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder imagemagick
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -93,13 +93,47 @@ jobs:
 
       - name: Build Flatpak Bundle
         run: |
-          # 1. Adiciona o repositório Flathub globalmente
+          # 0. Gera os metadados dinamicamente para a Loja
+          cat <<EOF > com.github.dfdevx2.ZarManager.desktop
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=ZarManager
+          Comment=XISO extraction and compression tool
+          Exec=ZarManager
+          Icon=com.github.dfdevx2.ZarManager
+          Terminal=false
+          Categories=Utility;System;
+          EOF
+          
+          cat <<EOF > com.github.dfdevx2.ZarManager.metainfo.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <component type="desktop-application">
+            <id>com.github.dfdevx2.ZarManager</id>
+            <metadata_license>CC0-1.0</metadata_license>
+            <project_license>MIT</project_license>
+            <name>ZarManager</name>
+            <summary>Universal XISO Extraction and Compression Tool</summary>
+            <description>
+              <p>ZarManager is a robust, cross-platform utility designed to automate the extraction and compression of XISO files, ZIP/RAR archives, and ZAR formats.</p>
+            </description>
+            <launchable type="desktop-id">com.github.dfdevx2.ZarManager.desktop</launchable>
+            <url type="homepage">https://github.com/dfdevx2/ZarManager</url>
+            <developer_name>dfdevx2</developer_name>
+            <update_contact>dfdevx2@github.com</update_contact>
+          </component>
+          EOF
+          
+          # Converte o ícone ICO em PNG para o Flatpak
+          convert img/icon.ico -resize 256x256 icon.png || touch icon.png
+          
+          # 1. Adiciona o repositório Flathub
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           
-          # 2. Instalação forçada do SDK e da Plataforma
+          # 2. Instalação do SDK e Plataforma
           sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
           
-          # 3. Constrói o Flatpak usando o nosso Manifesto
+          # 3. Constrói o Flatpak
           flatpak-builder --repo=repo --force-clean build-dir com.github.dfdevx2.ZarManager.yml
           
           # 4. Empacota num ficheiro .flatpak 
