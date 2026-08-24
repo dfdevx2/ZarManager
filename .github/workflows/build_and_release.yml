@@ -9,6 +9,7 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20  # Evita que o GitHub Actions cancele por tempo limite
 
     permissions:
       contents: write
@@ -42,9 +43,15 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y patchelf ccache
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (Linux)
+        if: runner.os == 'Linux'
         run: |
           python -m nuitka --onefile --enable-plugin=pyside6 --output-dir=dist app.py
+
+      - name: Build with Nuitka (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m nuitka --onefile --enable-plugin=pyside6 --nofollow-imports --windows-console-mode=disable --enable-plugin=pyside6 --output-dir=dist app.py
 
       - name: Rename Executable (Linux)
         if: runner.os == 'Linux'
