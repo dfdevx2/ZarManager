@@ -1,6 +1,6 @@
 # ZarManager
 
-ZarManager is an cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
+ZarManager is a cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
 
 ## Key Features
 
@@ -17,27 +17,30 @@ ZarManager is an cross-platform graphical tool designed to automate XISO extract
 
 ## Installation (Development Environment)
 
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/dfdevx2/ZarManager.git](https://github.com/dfdevx2/ZarManager.git)
-   cd ZarManager
-   ```
-2. python -m venv venv
+Clone the repository and set up the environment:
+
+```bash
+git clone [https://github.com/dfdevx2/ZarManager.git](https://github.com/dfdevx2/ZarManager.git)
+cd ZarManager
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-   ```
-3. Run the application:
+```
+
+Run the application:
 ```bash
-   python app.py
-   ```
-Compilation (Binaries)
-
-The project uses PyInstaller to build standalone binaries. To compile the application on your operating system, use the provided .spec file:
-
-Bash
-pyinstaller ZarManager.spec
+python app.py
 ```
-The final executable will be available in the dist/ directory.
+
+## Compilation (Binaries)
+
+The project uses Nuitka to compile standalone native binaries. To compile the application on your operating system, run:
+
+```bash
+python -m nuitka --onefile --enable-plugin=pyside6 --output-dir=dist app.py
 ```
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+The final executable will be available in the `dist/` directory.
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
