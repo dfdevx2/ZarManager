@@ -42,16 +42,16 @@ jobs:
           wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
           chmod +x appimagetool
 
-      - name: Build with Nuitka (Linux Standalone)
+      - name: Build with Nuitka (Linux Onefile)
         if: runner.os == 'Linux'
         run: |
-          python -m nuitka --standalone --enable-plugin=pyside6 --lto=no --output-dir=dist app.py
+          python -m nuitka --onefile --enable-plugin=pyside6 --lto=no --output-filename=ZarManager-Linux --output-dir=dist app.py
           
           # Criar estrutura AppDir para o AppImage
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/applications
           
           # Copiar binário e recursos
-          cp dist/app.bin AppDir/usr/bin/zarmanager
+          cp dist/ZarManager-Linux AppDir/usr/bin/zarmanager
           cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/zarmanager.png
           cp img/icon.png AppDir/zarmanager.png
           
@@ -76,15 +76,14 @@ jobs:
           
           # Gerar o AppImage
           ./appimagetool AppDir dist/ZarManager-v1.0.0-x86_64.AppImage
-          
-          # Renomear executável padrão também
-          mv dist/app.bin dist/ZarManager-Linux
 
-      - name: Build with Nuitka (Windows Executable with Icon & Metadata)
+      - name: Build with Nuitka (Windows Executable)
         if: runner.os == 'Windows'
         run: |
-          python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.0.0.0" --windows-product-version="1.0.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
-          move dist\app.exe dist\ZarManager-Windows.exe
+          # Remove o clcache para evitar conflitos de pré-processador com o MSVC no PySide6
+          pip uninstall -y clcache || true
+          
+          python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.0.0.0" --windows-product-version="1.0.0.0" --windows-company-name="dfdevx2" --output-filename=ZarManager-Windows.exe --output-dir=dist app.py
 
       - name: Upload Linux Artifacts
         if: runner.os == 'Linux'
