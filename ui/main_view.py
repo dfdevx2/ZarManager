@@ -30,10 +30,11 @@ class CoreWorkerThread(QThread):
     status_signal = Signal(object, str, str)
     finished_signal = Signal(object, object)
 
-    def __init__(self, request: ProcessRequest, workers: int, parent=None):
+    def __init__(self, request: ProcessRequest, workers: int, get_text_cb, parent=None):
         super().__init__(parent)
         self.req = request
         self.workers = workers
+        self.get_text = get_text_cb
         self.manager = None
 
     def run(self):
@@ -51,17 +52,19 @@ class CoreWorkerThread(QThread):
                     success, reason = verify_res
                 else:
                     success = bool(verify_res)
-                    reason = "O ambiente não atende aos requisitos mínimos."
+                    reason = self.get_text("err_env_min") or "Environment does not meet minimum requirements."
             else:
                 success, reason = True, ""
 
             if not success:
-                self.log_signal.emit(f"[ERRO CRÍTICO] {reason}", "ERROR")
+                t_crit = self.get_text("log_crit_env") or "[CRITICAL ERROR]"
+                self.log_signal.emit(f"{t_crit} {reason}", "ERROR")
                 self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
                 return
             
             if self.req.collision_policy == CollisionPolicy.OVERWRITE:
-                self.log_signal.emit("[SISTEMA] Política de sobrescrita ativada. A limpar conflitos no destino...", "WARNING")
+                t_over = self.get_text("log_over_act") or "[SYSTEM] Overwrite policy active. Cleaning conflicts in target..."
+                self.log_signal.emit(t_over, "WARNING")
                 for item in self.req.items:
                     name = item.stem + ".zar" if self.req.mode in [ProcessMode.AUTO, ProcessMode.COMPRESS] else item.name
                     target_file = self.req.target / name
@@ -71,9 +74,11 @@ class CoreWorkerThread(QThread):
                                 target_file.unlink()
                             elif target_file.is_dir():
                                 shutil.rmtree(target_file)
-                            self.log_signal.emit(f"[SISTEMA] Removido ficheiro anterior: {name}", "INFO")
+                            t_rem = self.get_text("log_rem_prev") or "[SYSTEM] Removed previous file:"
+                            self.log_signal.emit(f"{t_rem} {name}", "INFO")
                         except Exception as e:
-                            self.log_signal.emit(f"[ERRO] Falha ao sobrescrever {name}: {e}", "ERROR")
+                            t_err_over = self.get_text("log_err_over") or "[ERROR] Failed to overwrite"
+                            self.log_signal.emit(f"{t_err_over} {name}: {e}", "ERROR")
             
             self.manager.start_processing()
             
@@ -91,7 +96,8 @@ class CoreWorkerThread(QThread):
                 
         except Exception as e:
             logger.error("Exception in worker", exc_info=True)
-            self.log_signal.emit(f"[FATAL] Erro do motor: {e}. Verifique logs.", "ERROR")
+            t_fatal = self.get_text("log_fatal") or "[FATAL] Engine error:"
+            self.log_signal.emit(f"{t_fatal} {e}. Check logs.", "ERROR")
             self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
 
 
@@ -274,7 +280,7 @@ class MainController(QWidget):
         self.lbl_set_lang = QLabel()
         self.cb_lang = QComboBox()
         self.cb_lang.addItems(["pt-br", "en"])
-        idx_lang = self.cb_lang.findText(self.cfg.get("language") or "pt-br")
+        idx_lang = self.cb_lang.findText(self.cfg.get("language") or "en")
         if idx_lang >= 0: self.cb_lang.setCurrentIndex(idx_lang)
         
         def on_lang_change(txt):
@@ -314,7 +320,7 @@ class MainController(QWidget):
         
         def on_worker_change(val):
             self.cfg.set("workers", val)
-            self.lbl_set_workers.setText(f"{self.get_text('lbl_workers') or 'Workers'} (Atual: {val})")
+            self.lbl_set_workers.setText(f"{self.get_text('lbl_workers') or 'Workers'} (Current: {val})")
             
         self.slider_workers.valueChanged.connect(on_worker_change)
         
@@ -380,21 +386,21 @@ class MainController(QWidget):
         return w
 
     def retranslate_ui(self):
-        self.lbl_console.setText(self.get_text("lbl_console") or "Console de Registo")
-        self.tabs.setTabText(0, self.get_text("tab_auto") or "Modo Auto")
-        self.tabs.setTabText(1, self.get_text("tab_extract_arc") or "Extrair ZIP/RAR")
-        self.tabs.setTabText(2, self.get_text("tab_extract") or "Extrair ISO")
-        self.tabs.setTabText(3, self.get_text("tab_compress") or "Comprimir")
-        self.tabs.setTabText(self.settings_idx, self.get_text("tab_settings") or "Configurações")
-        self.tabs.setTabText(self.about_idx, self.get_text("tab_about") or "Sobre")
+        self.lbl_console.setText(self.get_text("lbl_console") or "Log Console")
+        self.tabs.setTabText(0, self.get_text("tab_auto") or "Auto Mode")
+        self.tabs.setTabText(1, self.get_text("tab_extract_arc") or "Extract ZIP/RAR")
+        self.tabs.setTabText(2, self.get_text("tab_extract") or "Extract ISO")
+        self.tabs.setTabText(3, self.get_text("tab_compress") or "Compress")
+        self.tabs.setTabText(self.settings_idx, self.get_text("tab_settings") or "Settings")
+        self.tabs.setTabText(self.about_idx, self.get_text("tab_about") or "About")
         
-        t_dir = self.get_text("lbl_directories") or "Diretórios"
-        t_src = self.get_text("lbl_search_source") or "Procurar Origem..."
-        t_tgt = self.get_text("lbl_search_target") or "Procurar Destino..."
-        t_sel = self.get_text("lbl_selectable_items") or "Itens Selecionáveis:"
-        t_inv = self.get_text("btn_invert_sel") or "Inverter Seleção"
-        t_sta = self.get_text("btn_start_proc") or "▶ Iniciar Processamento"
-        t_can = self.get_text("btn_cancel_proc") or "⏹ Cancelar"
+        t_dir = self.get_text("lbl_directories") or "Directories"
+        t_src = self.get_text("lbl_search_source") or "Browse Source..."
+        t_tgt = self.get_text("lbl_search_target") or "Browse Target..."
+        t_sel = self.get_text("lbl_selectable_items") or "Selectable Items:"
+        t_inv = self.get_text("btn_invert_sel") or "Invert Selection"
+        t_sta = self.get_text("btn_start_proc") or "▶ Start Processing"
+        t_can = self.get_text("btn_cancel_proc") or "⏹ Cancel"
         
         for mode, ui in self.tab_data.items():
             ui.lbl_title.setText(self.get_text(ui.title_key))
@@ -407,38 +413,51 @@ class MainController(QWidget):
             ui.btn_start.setText(t_sta)
             ui.btn_cancel.setText(t_can)
             if ui.state == ProcessState.PAUSED:
-                ui.btn_pause.setText(self.get_text("btn_resume_proc") or "▶ Retomar")
+                ui.btn_pause.setText(self.get_text("btn_resume_proc") or "▶ Resume")
             else:
-                ui.btn_pause.setText(self.get_text("btn_pause_proc") or "⏸ Pausar")
+                ui.btn_pause.setText(self.get_text("btn_pause_proc") or "⏸ Pause")
+            
+            # Update counter translations dynamically
+            if ui.lbl_counter:
+                txt = ui.lbl_counter.text()
+                parts = txt.split(" ")
+                if len(parts) >= 3:
+                    c = parts[0]
+                    t = parts[2]
+                    txt_proc = self.get_text("lbl_processed") or "processed"
+                    ui.lbl_counter.setText(f"{c} / {t} {txt_proc}")
 
-        self.lbl_set_title.setText(self.get_text("tab_settings") or "Configurações")
-        self.lbl_set_lang.setText((self.get_text("lbl_language") or "Idioma") + ":")
-        self.lbl_set_theme.setText((self.get_text("lbl_theme") or "Tema") + ":")
+        self.lbl_set_title.setText(self.get_text("tab_settings") or "Settings")
+        self.lbl_set_lang.setText((self.get_text("lbl_language") or "Language") + ":")
+        self.lbl_set_theme.setText((self.get_text("lbl_theme") or "Theme") + ":")
         val = self.slider_workers.value()
-        self.lbl_set_workers.setText(f"{self.get_text('lbl_workers') or 'Workers'} (Atual: {val})")
-        self.lbl_set_warn.setText(self.get_text("worker_warning") or "Aviso de Workers...")
+        self.lbl_set_workers.setText(f"{self.get_text('lbl_workers') or 'Workers'} (Current: {val})")
+        self.lbl_set_warn.setText(self.get_text("worker_warning") or "Worker Warning...")
         
-        self.lbl_ab_title.setText(self.get_text("tab_about") or "Sobre")
-        t_dev = self.get_text("lbl_about_dev") or "Desenvolvedor"
-        self.lbl_ab_info.setText(f"<b>ZarManager {self.app_version}</b><br><br>💻 {t_dev}: dfdevx2<br>📜 Licença: MIT License")
-        self.btn_ab_git.setText(self.get_text("btn_repo") or "🌐 Repositório Oficial no GitHub")
-        self.grp_ab_tut.setTitle(self.get_text("lbl_how_to_use") or "Como Usar")
+        self.lbl_ab_title.setText(self.get_text("tab_about") or "About")
+        t_dev = self.get_text("lbl_about_dev") or "Developer"
+        self.lbl_ab_info.setText(f"<b>ZarManager {self.app_version}</b><br><br>💻 {t_dev}: dfdevx2<br>📜 License: MIT License")
+        self.btn_ab_git.setText(self.get_text("btn_repo") or "🌐 Official GitHub Repository")
+        self.grp_ab_tut.setTitle(self.get_text("lbl_how_to_use") or "How to Use")
         self.lbl_ab_tut.setText(self.get_text("about_tutorial") or "Tutorial...")
-        self.chk_auto_upd.setText(self.get_text("lbl_auto_update") or "Procurar Atualizações Automáticas")
-        self.btn_ab_upd.setText(self.get_text("btn_check_update") or "Procurar Atualizações")
+        self.chk_auto_upd.setText(self.get_text("lbl_auto_update") or "Check for automatic updates")
+        self.btn_ab_upd.setText(self.get_text("btn_check_update") or "Check Updates")
 
     def _populate_initial_data(self):
-        self.emit_log(self.get_text("log_ready"), "INFO")
+        t_ready = self.get_text("log_ready") or "System ready for operation. Native optimized listing active."
+        self.emit_log(t_ready, "INFO")
         for m in [ProcessMode.AUTO, ProcessMode.EXTRACT_ARC, ProcessMode.EXTRACT_ISO, ProcessMode.COMPRESS]:
             self._refresh_file_list(m, self.cfg.get("source_dir") or "")
 
     def _select_dir(self, mode: ProcessMode, target_type: str, line_edit: QLineEdit):
         start_dir = line_edit.text()
-        chosen = DialogManager.select_directory(self, f"Selecione o diretório ({target_type})", start_dir)
+        t_sel_dir = self.get_text("lbl_select_dir") or "Select directory"
+        chosen = DialogManager.select_directory(self, f"{t_sel_dir} ({target_type})", start_dir)
         if chosen:
             self.cfg.set(f"{target_type}_dir", chosen)
             line_edit.setText(chosen)
-            self.emit_log(f"[SISTEMA] {target_type}_dir definido: {chosen}")
+            t_set = self.get_text("log_dir_set") or "[SYSTEM] Directory set:"
+            self.emit_log(f"{t_set} {target_type}_dir -> {chosen}")
             if target_type == "source":
                 self._refresh_file_list(mode, chosen)
 
@@ -449,7 +468,7 @@ class MainController(QWidget):
         
         files = FileService.find_processable_files(directory, mode)
         if not files:
-            msg = self.get_text("msg_no_files") or "Nenhum ficheiro compatível."
+            msg = self.get_text("msg_no_files") or "No compatible files found."
             item = QListWidgetItem(msg)
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             ui.list_view.addItem(item)
@@ -479,25 +498,28 @@ class MainController(QWidget):
         ui.btn_cancel.setEnabled(is_busy and state != ProcessState.CANCELLING)
         
         if state == ProcessState.PAUSED:
-            ui.btn_pause.setText(self.get_text("btn_resume_proc") or "▶ Retomar")
+            ui.btn_pause.setText(self.get_text("btn_resume_proc") or "▶ Resume")
         else:
-            ui.btn_pause.setText(self.get_text("btn_pause_proc") or "⏸ Pausar")
+            ui.btn_pause.setText(self.get_text("btn_pause_proc") or "⏸ Pause")
 
     def _start_pipeline(self, mode: ProcessMode):
         ui = self.tab_data[mode]
         
         if mode in self.active_threads or ui.state in {ProcessState.RUNNING, ProcessState.PAUSED, ProcessState.CANCELLING}:
-            DialogManager.show_error(self, "Aviso", f"O modo {mode.value} já está em execução.")
+            t_err_run = self.get_text("msg_err_running") or "Mode is already running."
+            DialogManager.show_error(self, "Warning", t_err_run)
             return
             
         target_dir = self.cfg.get("target_dir")
         if not target_dir: 
-            DialogManager.show_warning(self, "Erro", "Defina o diretório de destino.")
+            t_err_tgt = self.get_text("msg_err_target") or "Set the target directory."
+            DialogManager.show_warning(self, "Error", t_err_tgt)
             return
 
         selected = [path for path, item in ui.items.values() if item.checkState() == Qt.CheckState.Checked]
         if not selected: 
-            DialogManager.show_warning(self, "Aviso", "Selecione ao menos um ficheiro para processar.")
+            t_err_sel = self.get_text("msg_err_select") or "Select at least one file to process."
+            DialogManager.show_warning(self, "Warning", t_err_sel)
             return
 
         target_path = Path(target_dir)
@@ -509,12 +531,14 @@ class MainController(QWidget):
             resp = DialogManager.ask_custom(self, self.get_text("msg_collision_title"), self.get_text("msg_collision_desc"), 
                                             [self.get_text("btn_cancel"), self.get_text("btn_skip_existing"), self.get_text("btn_overwrite")])
             if resp == self.get_text("btn_cancel") or resp == "":
-                self.emit_log("[AVISO] Operação cancelada devido a conflitos.")
+                t_warn_canc = self.get_text("log_warn_cancelled") or "[WARNING] Operation cancelled due to conflicts."
+                self.emit_log(t_warn_canc, "WARNING")
                 return
             elif resp == self.get_text("btn_skip_existing"):
                 req.items = [p for p in req.items if p not in collisions]
                 if not req.items:
-                    self.emit_log("[AVISO] Fila vazia após pular conflitos.")
+                    t_warn_emp = self.get_text("log_warn_empty") or "[WARNING] Queue empty after skipping conflicts."
+                    self.emit_log(t_warn_emp, "WARNING")
                     return
                 req.collision_policy = CollisionPolicy.SKIP
             else:
@@ -523,8 +547,8 @@ class MainController(QWidget):
         self._prompt_deletion(req)
 
     def _prompt_deletion(self, req: ProcessRequest):
-        t_del = self.get_text("btn_delete_default") or "Apagar (Padrão)"
-        t_keep = self.get_text("btn_keep_originals") or "Manter Originais"
+        t_del = self.get_text("btn_delete_default") or "Delete (Default)"
+        t_keep = self.get_text("btn_keep_originals") or "Keep Originals"
         resp = DialogManager.ask_custom(self, self.get_text("delete_title"), self.get_text("delete_msg"), [t_del, t_keep])
         if resp == "": return 
         req.keep_originals = (resp == t_keep)
@@ -532,16 +556,17 @@ class MainController(QWidget):
 
     def _dispatch_worker(self, req: ProcessRequest):
         self._update_ui_state(req.mode, ProcessState.RUNNING)
-        self.emit_log(f"[SISTEMA] Iniciando Trabalhador (Modo: {req.mode.value} | {len(req.items)} itens).")
+        t_start = self.get_text("log_start_worker") or "[SYSTEM] Starting Worker"
+        self.emit_log(f"{t_start} (Mode: {req.mode.value} | {len(req.items)} items).", "INFO")
         
         ui = self.tab_data[req.mode]
         ui.progress.setValue(0)
         ui.lbl_percentage.setText("0%")
-        txt_proc = self.get_text("lbl_processed") or "processados"
+        txt_proc = self.get_text("lbl_processed") or "processed"
         ui.lbl_counter.setText(f"0 / {len(req.items)} {txt_proc}")
 
         workers = int(self.cfg.get("workers") or 4)
-        worker = CoreWorkerThread(req, workers, self)
+        worker = CoreWorkerThread(req, workers, self.get_text, self)
         
         worker.log_signal.connect(self.emit_log)
         worker.progress_signal.connect(self._on_progress_update)
@@ -556,18 +581,22 @@ class MainController(QWidget):
         if worker and worker.manager:
             st = worker.manager.toggle_pause()
             self._update_ui_state(mode, ProcessState.PAUSED if st else ProcessState.RUNNING)
-            self.emit_log(f"[SISTEMA] Processo {'Pausado' if st else 'Retomado'}.")
+            t_pause = self.get_text("log_paused") or "Paused"
+            t_resume = self.get_text("log_resumed") or "Resumed"
+            state_str = t_pause if st else t_resume
+            self.emit_log(f"[SYSTEM] Process {state_str}.", "INFO")
 
     def _request_cancel(self, mode: ProcessMode):
         worker = self.active_threads.get(mode)
         if worker and worker.manager:
             self._update_ui_state(mode, ProcessState.CANCELLING)
             worker.manager.request_cancel()
-            self.emit_log("[SISTEMA] Interrupção enviada. A aguardar que as threads parem com segurança...")
+            t_canc = self.get_text("log_cancelling") or "[SYSTEM] Cancel request sent. Waiting for threads to stop safely..."
+            self.emit_log(t_canc, "WARNING")
 
     def _check_for_updates(self):
         self.btn_ab_upd.setEnabled(False)
-        self.lbl_upd_status.setText("Checking for updates...")
+        self.lbl_upd_status.setText(self.get_text("lbl_checking_updates") or "Checking for updates...")
         
         def perform_check():
             try:
@@ -576,11 +605,11 @@ class MainController(QWidget):
                     has_update = UpdateService.check_latest(self.app_version)
                 
                 if has_update:
-                    self.lbl_upd_status.setText("New update available!")
+                    self.lbl_upd_status.setText(self.get_text("msg_update_avail") or "New update available!")
                 else:
-                    self.lbl_upd_status.setText("You are running the latest version.")
+                    self.lbl_upd_status.setText(self.get_text("msg_update_none") or "You are running the latest version.")
             except Exception:
-                self.lbl_upd_status.setText("No updates found or connection timeout.")
+                self.lbl_upd_status.setText(self.get_text("msg_update_fail") or "No updates found or connection timeout.")
             finally:
                 self.btn_ab_upd.setEnabled(True)
                 QTimer.singleShot(5000, lambda: self.lbl_upd_status.setText(""))
@@ -604,14 +633,29 @@ class MainController(QWidget):
         val = int(r * 100)
         ui.progress.setValue(val)
         ui.lbl_percentage.setText(f"{val}%")
-        txt_proc = self.get_text("lbl_processed") or "processados"
+        txt_proc = self.get_text("lbl_processed") or "processed"
         ui.lbl_counter.setText(f"{c} / {t} {txt_proc}")
 
     @Slot(object, str, str)
     def _on_status_update(self, mode: ProcessMode, item_name: str, status: str):
-        if "FALHA" in status.upper():
+        # Tradução dinâmica instantânea do core.py baseada no idioma selecionado
+        t_extracting_iso = self.get_text("log_extracting_iso") or "EXTRACTING ISO"
+        t_extracting_arc = self.get_text("log_extracting_arc") or "EXTRACTING ARCHIVE"
+        t_compressing = self.get_text("log_compressing") or "COMPRESSING ZAR"
+        t_completed = self.get_text("log_completed") or "COMPLETED"
+        t_failed = self.get_text("log_failed") or "FAILED"
+        t_cancelled = self.get_text("log_cancelled") or "CANCELLED"
+        
+        status = status.replace("EXTRAINDO ISO", t_extracting_iso)
+        status = status.replace("DESCOMPACTANDO", t_extracting_arc)
+        status = status.replace("COMPRIMINDO ZAR", t_compressing)
+        status = status.replace("CONCLUIDO", t_completed)
+        status = status.replace("FALHA", t_failed)
+        status = status.replace("CANCELADO", t_cancelled)
+
+        if "FALHA" in status.upper() or t_failed.upper() in status.upper():
             SoundService.play("error")
-            self.emit_log(f"[ERRO ITEM] {item_name}: {status}", "ERROR")
+            self.emit_log(f"[{item_name}] {status}", "ERROR")
         else:
             self.emit_log(f"[{item_name}] {status}", "INFO")
 
@@ -622,13 +666,19 @@ class MainController(QWidget):
         
         if state == ProcessState.COMPLETED:
             SoundService.play("success")
-            self.emit_log(f"[SUCESSO] Operação {mode.value} finalizada perfeitamente.")
-            DialogManager.show_info(self, "Concluído", "O processamento em lote terminou sem erros.")
+            t_succ = self.get_text("log_succ") or "[SUCCESS] Operation finished perfectly."
+            self.emit_log(t_succ, "INFO")
+            t_done = self.get_text("msg_done") or "Completed"
+            t_done_desc = self.get_text("msg_done_desc") or "Batch processing finished without errors."
+            DialogManager.show_info(self, t_done, t_done_desc)
         elif state == ProcessState.PARTIAL:
             SoundService.play("error")
-            self.emit_log(f"[AVISO] Operação {mode.value} terminou com falhas parciais.", "WARNING")
+            t_warn = self.get_text("log_warn_partial") or "[WARNING] Operation finished with partial failures."
+            self.emit_log(t_warn, "WARNING")
         elif state == ProcessState.FAILED:
             SoundService.play("error")
-            self.emit_log(f"[ERRO] Operação {mode.value} falhou criticamente.", "ERROR")
+            t_err = self.get_text("log_err_crit") or "[ERROR] Operation failed critically."
+            self.emit_log(t_err, "ERROR")
         elif state == ProcessState.CANCELLED:
-            self.emit_log(f"[SISTEMA] Operação {mode.value} foi cancelada pelo utilizador.")
+            t_usr_canc = self.get_text("log_usr_canc") or "[SYSTEM] Operation cancelled by the user."
+            self.emit_log(t_usr_canc, "INFO")

@@ -1,13 +1,14 @@
 import sys
 import platform
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QPalette, QColor, QCloseEvent
 from PySide6.QtCore import Qt
 
 from config import ConfigManager
 from version import __version__
 from ui.welcome_view import WelcomeView
 from ui.main_view import MainController
+from ui.dialogs import DialogManager
 
 class ZarManagerApp(QMainWindow):
     def __init__(self, cfg):
@@ -37,7 +38,6 @@ class ZarManagerApp(QMainWindow):
         palette = QPalette()
         
         if theme_name == "Preto":
-            # TEMA AMOLED (Preto Absoluto)
             palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))          
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(8, 8, 8))            
@@ -53,8 +53,7 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
             
         elif theme_name == "Steam":
-            # TEMA STEAM (Azul mais escuro / Profundo)
-            palette.setColor(QPalette.ColorRole.Window, QColor(15, 24, 34))       # Azul Profundo
+            palette.setColor(QPalette.ColorRole.Window, QColor(15, 24, 34))
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 14, 19))         
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 35, 50))
@@ -69,8 +68,7 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
 
         elif theme_name == "Xbox":
-            # TEMA XBOX (Estrutura idêntica à da Steam, mas em tons de verde escuro)
-            palette.setColor(QPalette.ColorRole.Window, QColor(15, 34, 18))       # Verde Profundo
+            palette.setColor(QPalette.ColorRole.Window, QColor(15, 34, 18))
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 19, 12))         
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 50, 25))
@@ -96,6 +94,26 @@ class ZarManagerApp(QMainWindow):
         self.main_view = MainController(self.cfg, f"v{__version__}", self.apply_theme)
         self.stack.addWidget(self.main_view)
         self.stack.setCurrentWidget(self.main_view)
+
+    def closeEvent(self, event: QCloseEvent):
+        # Proteção contra Ghost Processes
+        if hasattr(self, 'main_view') and self.main_view.active_threads:
+            title = self.main_view.get_text("warn_exit_title") or "Warning"
+            msg = self.main_view.get_text("warn_exit_msg") or "There are active processes running. Are you sure you want to cancel them and exit?"
+            btn_yes = self.main_view.get_text("btn_exit_yes") or "Exit & Cancel"
+            btn_no = self.main_view.get_text("btn_exit_no") or "Return"
+            
+            resp = DialogManager.ask_custom(self, title, msg, [btn_yes, btn_no])
+            
+            if resp == btn_yes:
+                for mode, worker in self.main_view.active_threads.items():
+                    if worker and worker.manager:
+                        worker.manager.request_cancel()
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
 def main():
     app = QApplication(sys.argv)
