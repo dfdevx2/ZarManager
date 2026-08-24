@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton, QLineEdit, QListWidget, QListWidgetItem,
     QProgressBar, QTextEdit, QGroupBox, QComboBox, QSlider, QCheckBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl
+from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QTimer
 from PySide6.QtGui import QFont, QDesktopServices
 
 import locales
@@ -566,7 +566,26 @@ class MainController(QWidget):
             self.emit_log("[SISTEMA] Interrupção enviada. A aguardar que as threads parem com segurança...")
 
     def _check_for_updates(self):
-        self.lbl_upd_status.setText("A verificar...")
+        self.btn_ab_upd.setEnabled(False)
+        self.lbl_upd_status.setText("Checking for updates...")
+        
+        def perform_check():
+            try:
+                has_update = False
+                if hasattr(UpdateService, 'check_latest'):
+                    has_update = UpdateService.check_latest(self.app_version)
+                
+                if has_update:
+                    self.lbl_upd_status.setText("New update available!")
+                else:
+                    self.lbl_upd_status.setText("You are running the latest version.")
+            except Exception:
+                self.lbl_upd_status.setText("No updates found or connection timeout.")
+            finally:
+                self.btn_ab_upd.setEnabled(True)
+                QTimer.singleShot(5000, lambda: self.lbl_upd_status.setText(""))
+
+        QTimer.singleShot(800, perform_check)
 
     @Slot(str, str)
     def emit_log(self, msg: str, level: str = "INFO"):
