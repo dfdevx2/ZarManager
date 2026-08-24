@@ -1,5 +1,4 @@
-# core.py
-
+import os
 import sys
 import subprocess
 import threading
@@ -32,8 +31,9 @@ class ZarManagerCore:
         self.file_progress = {Path(p).name: 0.0 for p in selected_items}
         self.file_progress_lock = threading.Lock()
         
-        if getattr(sys, 'frozen', False):
-            self.base_dir = Path(sys._MEIPASS)
+        # Lógica de resolução de caminhos atualizada para compatibilidade com o Nuitka
+        if "__compiled__" in globals() or hasattr(sys, 'frozen'):
+            self.base_dir = Path(os.path.dirname(__file__)).resolve()
         else:
             self.base_dir = Path(__file__).parent.resolve()
             
