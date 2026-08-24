@@ -1,1 +1,2 @@
-customtkinter==5.2.2
+PySide6>=6.5.0
+# Mantenha abaixo apenas as bibliotecas que o seu core.py utiliza

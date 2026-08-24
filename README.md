@@ -1,81 +1,43 @@
-<div align="center">
-  <img src="img/logo.png" alt="ZarManager Logo" width="200"/>
-  <h1>ZarManager</h1>
-  <p>A powerful GUI tool to extract XISO files and compress them into ZAR format.</p>
-</div>
+# ZarManager
 
----
+ZarManager is an cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
 
-## 📌 About The Project
+## Key Features
 
-**ZarManager** was developed to automate and simplify the process of extracting Xbox 360 ISO files (XDVDFS) and subsequently compressing the extracted files into the `.zar` format. 
+* **Automated Pipeline:** Reads directories, identifies `.zip`, `.rar`, `.7z`, and `.iso` files, runs cascading extractions, and compresses the final output autonomously.
+* **Multi-Threaded Performance:** Flexible worker configuration for concurrent extraction and compression adapted to your hardware, maximizing disk utilization.
+* **Native Stability:** Built with **PySide6 (Qt)** featuring strict asynchronous background execution (`QThread`), ensuring absolute fluidity across Windows, Linux (X11/Wayland), and macOS.
+* **Dynamic Interface:** Real-time support for multiple visual themes (AMOLED, Steam, Xbox, Light) and languages (PT-BR, EN) without restarting.
+* **Data Safety:** Automatic handling of file collisions with granular options for overwriting and preserving source files.
 
-Initially designed with Linux in mind, it has evolved into a cross-platform application (Windows and Linux) capable of running smoothly even through compatibility layers like Winlator on Android.
+## System Requirements
 
-### 🎯 Purpose
-Managing and converting large ISO files can be tedious when using command-line tools manually. ZarManager provides a clean, user-friendly interface to batch process these files efficiently, utilizing multi-threading to speed up the workflow while keeping the UI responsive.
+* Python 3.10 or higher
+* PySide6 (>= 6.5.0)
 
-## 🚀 Features
+## Installation (Development Environment)
 
-*   **Batch Processing:** Select multiple files or directories to process at once.
-*   **Full Pipeline (Auto Mode):** Automatically extracts an ISO and immediately compresses its contents into a `.zar` file, cleaning up temporary files afterwards.
-*   **Isolated Modes:** Choose to only extract an ISO or only compress a directory.
-*   **Real-time Progress:** Accurate, fluid progress bars and item counters.
-*   **Cross-Platform:** Works natively on Windows and Linux.
-*   **Winlator Compatible:** Specifically optimized to run without UI freezes when emulated on Android via Winlator.
-
-## 🛠️ Built With
-
-*   [Python](https://www.python.org/)
-*   [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) - For the modern GUI.
-*   [extract-xiso](https://github.com/XboxDev/extract-xiso) - For ISO extraction.
-*   [zarchive](https://github.com/vasi/zarchive) - For ZAR compression.
-
-*Disclaimer: AI tools were used during the development of this project to assist with code structuring, logic optimization, and code review.*
-
-## 📥 Installation (Pre-compiled Binaries)
-
-You don't need to install Python to use ZarManager. You can download the ready-to-use binaries from the **[Releases](../../releases)** page.
-
-1. Go to the Releases page.
-2. Download `ZarManager-Windows.zip` or `ZarManager-Linux.zip`.
-3. Extract the folder.
-4. Run the executable (`ZarManager.exe` on Windows or `ZarManager` on Linux).
-
-## 💻 Building from Source
-
-If you prefer to run from the source code or build it yourself:
-
-### Prerequisites
-*   Python 3.10+
-*   The `bin` folder containing the required executables (`extract-xiso`, `zarchive` for Linux; `extract-xiso.exe`, `zarchive.exe` for Windows).
-
-### Setup
-
-1.  Clone the repository:
-    ```bash
-    git clone [https://github.com/YOUR_USERNAME/ZarManager.git](https://github.com/YOUR_USERNAME/ZarManager.git)
-    cd ZarManager
-    ```
-
-2.  Install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  Run the application:
-    ```bash
-    python app.py
-    ```
-
-### Building the Executable
-
-You can build the executable yourself using PyInstaller.
-
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/dfdevx2/ZarManager.git](https://github.com/dfdevx2/ZarManager.git)
+   cd ZarManager
+   ```
+2. python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+   ```
+3. Run the application:
 ```bash
-pip install pyinstaller
+   python app.py
+   ```
+Compilation (Binaries)
+
+The project uses PyInstaller to build standalone binaries. To compile the application on your operating system, use the provided .spec file:
+
+Bash
 pyinstaller ZarManager.spec
-cp -r bin dist/ZarManager/  # On Windows, use: xcopy /E /I /Y bin dist\ZarManager\bin
 ```
-## 📜 License
-This project is free to use. However, commercial use and reselling are strictly prohibited. See the LICENSE file for more details.
+The final executable will be available in the dist/ directory.
+```
+License
+This project is licensed under the MIT License. See the LICENSE file for details.
