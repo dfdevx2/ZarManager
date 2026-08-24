@@ -15,9 +15,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: Linux-Builds
+            artifact_name: linux-assets
           - os: windows-latest
-            artifact_name: Windows-Builds
+            artifact_name: windows-assets
 
     steps:
       - name: Checkout Repository
@@ -50,12 +50,10 @@ jobs:
           # Criar estrutura AppDir para o AppImage
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/applications
           
-          # Copiar binário e recursos
           cp dist/ZarManager-Linux AppDir/usr/bin/zarmanager
           cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/zarmanager.png
           cp img/icon.png AppDir/zarmanager.png
           
-          # Criar ficheiro .desktop para o Linux
           cat << 'EOF' > AppDir/usr/share/applications/zarmanager.desktop
           [Desktop Entry]
           Type=Application
@@ -66,7 +64,6 @@ jobs:
           EOF
           cp AppDir/usr/share/applications/zarmanager.desktop AppDir/
           
-          # Criar AppRun
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
@@ -74,37 +71,34 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          # Gerar o AppImage
           ./appimagetool AppDir dist/ZarManager-v1.0.0-x86_64.AppImage
+          
+          # Organizar numa pasta de assets limpa
+          mkdir -p release_assets
+          cp dist/ZarManager-Linux release_assets/
+          cp dist/ZarManager-v1.0.0-x86_64.AppImage release_assets/
 
       - name: Build with Nuitka (Windows via MinGW64)
         if: runner.os == 'Windows'
         run: |
           python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.0.0.0" --windows-product-version="1.0.0.0" --windows-company-name="dfdevx2" --output-filename=ZarManager-Windows.exe --output-dir=dist app.py
+          
+          mkdir release_assets
+          cp dist/ZarManager-Windows.exe release_assets/
 
       - name: Sign Windows Executable (Self-Signed Certificate)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=dfdevx2, O=ZarManager" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(5)
-          Set-AuthenticodeSignature -FilePath "dist\ZarManager-Windows.exe" -Certificate $cert
+          Set-AuthenticodeSignature -FilePath "release_assets\ZarManager-Windows.exe" -Certificate $cert
           Write-Host "ZarManager-Windows.exe assinado com sucesso!"
 
-      - name: Upload Linux Artifacts
-        if: runner.os == 'Linux'
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-Binaries
-          path: |
-            dist/ZarManager-Linux
-            dist/ZarManager-v1.0.0-x86_64.AppImage
-
-      - name: Upload Windows Artifacts
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-Binaries
-          path: dist/ZarManager-Windows.exe
+          name: ${{ matrix.artifact_name }}
+          path: release_assets/*
 
   release:
     needs: build
@@ -124,24 +118,7 @@ jobs:
           name: ZarManager v1.0.0
           tag_name: v1.0.0
           files: |
-            Linux-Binaries/ZarManager-Linux
-            Linux-Binaries/Linux-Binaries/ZarManager-v1.0.0-x86_64.AppImage
-            Windows-Binaries/ZarManager-Windows.exe
-          body: |
-            ## 🚀 ZarManager v1.0.0 - Stable Production Release
-            
-            This stable release brings a pure PySide6 architecture, comprehensive desktop integration, and optimized native binaries compiled via Nuitka.
-            
-            ### ✨ Key Features & Improvements
-            * **Pure PySide6 Architecture:** Full removal of legacy dependencies like Flet, ensuring maximum performance, low resource consumption, and stable background multi-threading (`QThread`).
-            * **Linux AppImage Support:** Generates a portable `.AppImage` bundle featuring embedded desktop icons and metadata integration, alongside the standard binary.
-            * **Advanced Windows Build:** Embedded application icon (`icon.ico`), clean product metadata, and digital code signing to enhance execution reliability.
-            * **Synchronized Versioning:** Unified version management across the main application window and the "About" tab.
-            * **Reliable Batch Processing:** Advanced XISO extraction and asynchronous batch compression pipeline.
-            
-            ### 📦 Official Binaries
-            * `ZarManager-v1.0.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
-            * `ZarManager-Linux` (Standard Linux portable binary)
-            * `ZarManager-Windows.exe` (Standalone Windows executable with embedded icon, metadata and digital signature)
+            linux-assets/*
+            windows-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
