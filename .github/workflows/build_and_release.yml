@@ -11,9 +11,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
-    permissions:
-      contents: write
-
     strategy:
       matrix:
         include:
@@ -47,21 +44,29 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           python -m nuitka --onefile --enable-plugin=pyside6 --lto=no --output-dir=dist app.py
+          mv dist/app.bin dist/ZarManager-Linux
 
       - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
         run: |
           python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --output-dir=dist app.py
-
-      - name: Rename Executable (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          mv dist/app.bin dist/ZarManager-Linux
-
-      - name: Rename Executable (Windows)
-        if: runner.os == 'Windows'
-        run: |
           move dist\app.exe dist\ZarManager-Windows.exe
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.artifact_name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create GitHub Release Draft
         uses: softprops/action-gh-release@v1
@@ -70,7 +75,7 @@ jobs:
           prerelease: false
           name: ZarManager ${{ github.ref_name }}
           files: |
-            dist/ZarManager-Linux
-            dist/ZarManager-Windows.exe
+            ZarManager-Linux/ZarManager-Linux
+            ZarManager-Windows.exe/ZarManager-Windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
