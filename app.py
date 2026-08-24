@@ -5,6 +5,7 @@ from PySide6.QtGui import QPalette, QColor
 from PySide6.QtCore import Qt
 
 from config import ConfigManager
+from version import __version__
 from ui.welcome_view import WelcomeView
 from ui.main_view import MainController
 
@@ -12,7 +13,7 @@ class ZarManagerApp(QMainWindow):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.setWindowTitle("ZarManager v2.0.2")
+        self.setWindowTitle(f"ZarManager v{__version__}")
         self.setMinimumSize(1050, 750)
 
         self.stack = QStackedWidget()
@@ -84,7 +85,6 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
             
         else:
-            # Temas do Sistema / Claro
             palette = app.style().standardPalette()
             if theme_name == "Branco":
                 palette.setColor(QPalette.ColorRole.Highlight, QColor(59, 142, 208))
@@ -93,7 +93,7 @@ class ZarManagerApp(QMainWindow):
 
     def boot_main_app(self):
         self.cfg.set("first_boot_done", True)
-        self.main_view = MainController(self.cfg, "v2.0.2", self.apply_theme)
+        self.main_view = MainController(self.cfg, f"v{__version__}", self.apply_theme)
         self.stack.addWidget(self.main_view)
         self.stack.setCurrentWidget(self.main_view)
 

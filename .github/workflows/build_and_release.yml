@@ -15,9 +15,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: ZarManager-Linux
+            artifact_name: Linux-Builds
           - os: windows-latest
-            artifact_name: ZarManager-Windows.exe
+            artifact_name: Windows-Builds
 
     steps:
       - name: Checkout Repository
@@ -35,28 +35,72 @@ jobs:
           pip install -r requirements.txt
           pip install nuitka
 
-      - name: Install Linux System Dependencies
+      - name: Install Linux System Dependencies & AppImage tools
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update && sudo apt-get install -y patchelf ccache
+          sudo apt-get update && sudo apt-get install -y patchelf ccache wget file
+          wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
 
-      - name: Build with Nuitka (Linux)
+      - name: Build with Nuitka (Linux Standalone)
         if: runner.os == 'Linux'
         run: |
-          python -m nuitka --onefile --enable-plugin=pyside6 --lto=no --output-dir=dist app.py
+          python -m nuitka --standalone --enable-plugin=pyside6 --lto=no --output-dir=dist app.py
+          
+          # Criar estrutura AppDir para o AppImage
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/applications
+          
+          # Copiar binário e recursos
+          cp dist/app.bin AppDir/usr/bin/zarmanager
+          cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/zarmanager.png
+          cp img/icon.png AppDir/zarmanager.png
+          
+          # Criar ficheiro .desktop para o Linux
+          cat << 'EOF' > AppDir/usr/share/applications/zarmanager.desktop
+          [Desktop Entry]
+          Type=Application
+          Name=ZarManager
+          Exec=zarmanager
+          Icon=zarmanager
+          Categories=Utility;
+          EOF
+          cp AppDir/usr/share/applications/zarmanager.desktop AppDir/
+          
+          # Criar AppRun
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/zarmanager" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          
+          # Gerar o AppImage
+          ./appimagetool AppDir dist/ZarManager-v1.0.0-x86_64.AppImage
+          
+          # Renomear executável padrão também
           mv dist/app.bin dist/ZarManager-Linux
 
-      - name: Build with Nuitka (Windows)
+      - name: Build with Nuitka (Windows Executable with Icon & Metadata)
         if: runner.os == 'Windows'
         run: |
-          python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --output-dir=dist app.py
+          python -m nuitka --onefile --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.0.0.0" --windows-product-version="1.0.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
           move dist\app.exe dist\ZarManager-Windows.exe
 
-      - name: Upload Artifact
+      - name: Upload Linux Artifacts
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.artifact_name }}
+          name: Linux-Binaries
+          path: |
+            dist/ZarManager-Linux
+            dist/ZarManager-v1.0.0-x86_64.AppImage
+
+      - name: Upload Windows Artifacts
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Binaries
+          path: dist/ZarManager-Windows.exe
 
   release:
     needs: build
@@ -65,17 +109,35 @@ jobs:
       contents: write
 
     steps:
-      - name: Download Artifacts
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
 
-      - name: Create GitHub Release Draft
+      - name: Create GitHub Release Draft with Changelog
         uses: softprops/action-gh-release@v1
         with:
           draft: true
           prerelease: false
-          name: ZarManager ${{ github.ref_name }}
+          name: ZarManager v1.0.0
+          tag_name: v1.0.0
           files: |
-            ZarManager-Linux/ZarManager-Linux
-            ZarManager-Windows.exe/ZarManager-Windows.exe
+            Linux-Binaries/ZarManager-Linux
+            Linux-Binaries/ZarManager-v1.0.0-x86_64.AppImage
+            Windows-Binaries/ZarManager-Windows.exe
+          body: |
+            ## 🚀 ZarManager v1.0.0 - Stable Production Release
+            
+            This stable release brings a pure PySide6 architecture, comprehensive desktop integration, and optimized native binaries compiled via Nuitka.
+            
+            ### ✨ Key Features & Improvements
+            * **Pure PySide6 Architecture:** Full removal of legacy dependencies like Flet, ensuring maximum performance, low resource consumption, and stable background multi-threading (`QThread`).
+            * **Linux AppImage Support:** Generates a portable `.AppImage` bundle featuring embedded desktop icons and metadata integration, alongside the standard binary.
+            * **Advanced Windows Build:** Embedded application icon (`icon.ico`) and clean product metadata to enhance execution reliability and minimize generic security heuristic warnings.
+            * **Synchronized Versioning:** Unified version management across the main application window and the "About" tab.
+            * **Reliable Batch Processing:** Advanced XISO extraction and asynchronous batch compression pipeline.
+            
+            ### 📦 Official Binaries
+            * `ZarManager-v1.0.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
+            * `ZarManager-Linux` (Standard Linux portable binary)
+            * `ZarManager-Windows.exe` (Standalone Windows executable with embedded icon and metadata)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

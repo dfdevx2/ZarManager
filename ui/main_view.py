@@ -45,7 +45,6 @@ class CoreWorkerThread(QThread):
         )
         
         try:
-            # 1. Correção Absoluta do Booleano (Resolve o Erro da Print)
             if hasattr(self.manager, 'verify_environment'):
                 verify_res = self.manager.verify_environment()
                 if isinstance(verify_res, tuple):
@@ -61,7 +60,6 @@ class CoreWorkerThread(QThread):
                 self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
                 return
             
-            # 2. Implementação Rigorosa de Sobrescrita (Garante que o core nunca falhe por conflitos)
             if self.req.collision_policy == CollisionPolicy.OVERWRITE:
                 self.log_signal.emit("[SISTEMA] Política de sobrescrita ativada. A limpar conflitos no destino...", "WARNING")
                 for item in self.req.items:
@@ -77,7 +75,6 @@ class CoreWorkerThread(QThread):
                         except Exception as e:
                             self.log_signal.emit(f"[ERRO] Falha ao sobrescrever {name}: {e}", "ERROR")
             
-            # 3. Arranca o Processamento
             self.manager.start_processing()
             
             stats = self.manager.get_completion_stats() if hasattr(self.manager, 'get_completion_stats') else {"failed": 0, "completed": len(self.req.items), "cancelled": 0, "total": len(self.req.items)}
