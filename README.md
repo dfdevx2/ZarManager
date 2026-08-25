@@ -6,6 +6,17 @@
 
 ZarManager is a cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
 
+## Interface & Features
+
+<p align="center">
+  <img src="img/print1.png" alt="ZarManager Interface 1" width="49%">
+  <img src="img/print2.png" alt="ZarManager Interface 2" width="49%">
+</p>
+<p align="center">
+  <img src="img/print3.png" alt="ZarManager Interface 3" width="49%">
+  <img src="img/print4.png" alt="ZarManager Interface 4" width="49%">
+</p>
+
 ## Key Features
 
 * **Automated Pipeline:** Reads directories, identifies `.zip`, `.rar`, `.7z`, and `.iso` files, runs cascading extractions, and compresses the final output autonomously.
