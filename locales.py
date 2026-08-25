@@ -1,5 +1,3 @@
-# locales.py
-
 TRANSLATIONS = {
     "pt-br": {
         # === TÍTULOS E ABAS ===
@@ -72,6 +70,12 @@ TRANSLATIONS = {
         "delete_msg": "Por padrão, a ferramenta deleta os arquivos de origem (ISOs, ZIPs, Pastas) após o sucesso da operação para economizar espaço no disco.\n\nDeseja MANTER os arquivos originais?\n\n• Manter Originais: Mantém a origem e o arquivo gerado.\n• Apagar (Padrão): Exclui a origem após gerar o arquivo.",
         "btn_delete_default": "Apagar (Padrão)",
         "btn_keep_originals": "Manter Originais",
+
+        # === DIÁLOGO DE ENCERRAMENTO (ANTI-GHOSTING) ===
+        "warn_exit_title": "Aviso de Encerramento",
+        "warn_exit_msg": "Existem processos ativos em segundo plano.\nSe fechar agora, o programa irá cancelar e abortar tudo de forma segura.\n\nDeseja mesmo sair?",
+        "btn_exit_yes": "Sair e Abortar",
+        "btn_exit_no": "Cancelar e Voltar",
 
         # === DICAS / TOOLTIPS ===
         "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até o final (.zar) e limpa os resíduos.",
@@ -155,6 +159,12 @@ TRANSLATIONS = {
         "delete_msg": "By default, the tool deletes source files (ISOs, ZIPs, Folders) after a successful operation to save disk space.\n\nDo you want to KEEP the original files?\n\n• Keep Originals: Keeps both the source and the generated file.\n• Delete (Default): Deletes the source after generation.",
         "btn_delete_default": "Delete (Default)",
         "btn_keep_originals": "Keep Originals",
+
+        # === EXIT DIALOG (ANTI-GHOSTING) ===
+        "warn_exit_title": "Exit Warning",
+        "warn_exit_msg": "There are active background processes running.\nIf you exit now, the program will safely cancel and abort everything.\n\nDo you really want to exit?",
+        "btn_exit_yes": "Exit and Abort",
+        "btn_exit_no": "Cancel and Return",
 
         # === TIPS / TOOLTIPS ===
         "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar.",

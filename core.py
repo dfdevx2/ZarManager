@@ -27,11 +27,9 @@ class ZarManagerCore:
         self.completed_tasks = 0
         self.total_tasks = len(self.items)
         
-        # Dicionário para rastrear o progresso exato (0.0 a 1.0) de cada ficheiro independentemente
         self.file_progress = {Path(p).name: 0.0 for p in selected_items}
         self.file_progress_lock = threading.Lock()
         
-        # Lógica de resolução de caminhos atualizada para compatibilidade com o Nuitka
         if "__compiled__" in globals() or hasattr(sys, 'frozen'):
             self.base_dir = Path(os.path.dirname(__file__)).resolve()
         else:
@@ -84,7 +82,12 @@ class ZarManagerCore:
         self.log("[SISTEMA] Abortando fila...")
 
     def start_processing(self):
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        # TRAVA INTELIGENTE: Reduz os workers para coincidir com os ficheiros se a fila for mais pequena
+        actual_workers = min(self.max_workers, len(self.items))
+        if actual_workers < 1: 
+            actual_workers = 1 
+            
+        with ThreadPoolExecutor(max_workers=actual_workers) as executor:
             futures = [executor.submit(self._pipeline, item) for item in self.items]
             for future in futures:
                 try:
@@ -98,7 +101,6 @@ class ZarManagerCore:
             self.log("[SISTEMA] Lote concluído com sucesso.")
 
     def update_file_progress(self, name, progress):
-        """Calcula o progresso global combinando a percentagem em tempo real de todas as threads"""
         with self.file_progress_lock:
             self.file_progress[name] = progress
             total_ratio = sum(self.file_progress.values()) / self.total_tasks
@@ -114,7 +116,6 @@ class ZarManagerCore:
         current_path = item_path
         original_suffix = current_path.suffix.lower()
 
-        # Motor de Pesos: Divide a barra de progresso do ficheiro consoante o seu tipo e modo
         def get_step_info(step_id):
             if self.mode == 'auto':
                 if original_suffix in ['.zip', '.rar', '.7z', '.tar', '.gz']:
@@ -129,7 +130,6 @@ class ZarManagerCore:
             return 0.0, 1.0
 
         try:
-            # ETAPA 1: 7-Zip
             if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
                 temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
                 cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
@@ -165,7 +165,6 @@ class ZarManagerCore:
                     self._finalize_item(original_name, "CONCLUIDO")
                     return
 
-            # ETAPA 2: Extrair XISO
             if self.mode in ['auto', 'extract'] and current_path.is_file() and current_path.suffix.lower() == '.iso':
                 iso_extract_dir = self.target_dir / current_path.stem
                 iso_extract_dir.mkdir(parents=True, exist_ok=True)
@@ -185,10 +184,8 @@ class ZarManagerCore:
                     self._finalize_item(original_name, "CONCLUIDO")
                     return
 
-            # ETAPA 3: Comprimir para ZAR
             if self.mode in ['auto', 'compress'] and current_path.is_dir():
                 zar_output = self.target_dir / f"{current_path.name}.zar"
-                # CORREÇÃO CRÍTICA DO ZARCHIVE: A ordem correta é ZArchive [origem] [destino]
                 cmd = [str(self.zar_bin), str(current_path), str(zar_output)]
                 
                 b, w = get_step_info('zar')

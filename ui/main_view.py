@@ -310,7 +310,8 @@ class MainController(QWidget):
         theme_layout.addWidget(self.cb_theme)
         theme_layout.addStretch()
         
-        workers_val = int(self.cfg.get("workers") or 4)
+        # Padrão alterado de 4 para 2
+        workers_val = int(self.cfg.get("workers") or 2)
         self.lbl_set_workers = QLabel()
         
         self.slider_workers = QSlider(Qt.Orientation.Horizontal)
@@ -558,7 +559,8 @@ class MainController(QWidget):
         txt_proc = self.get_text("lbl_processed", "processados")
         ui.lbl_counter.setText(f"0 / {len(req.items)} {txt_proc}")
 
-        workers = int(self.cfg.get("workers") or 4)
+        # Padrão alterado de 4 para 2
+        workers = int(self.cfg.get("workers") or 2)
         worker = CoreWorkerThread(req, workers, self)
         
         worker.log_signal.connect(self.emit_log)
@@ -610,7 +612,6 @@ class MainController(QWidget):
 
     @Slot(str, str)
     def emit_log(self, msg: str, level: str = "INFO"):
-        # Tradução Dinâmica Intercetada! Se o idioma estiver em inglês, as strings base do motor são traduzidas em tempo real
         lang = self.cfg.get("language") or "pt-br"
         if lang == "en":
             msg = msg.replace("[ERRO CRÍTICO]", "[CRITICAL ERROR]")
