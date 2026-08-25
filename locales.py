@@ -77,6 +77,14 @@ TRANSLATIONS = {
         "btn_exit_yes": "Sair e Abortar",
         "btn_exit_no": "Cancelar e Voltar",
 
+        # === STATUS DO PROCESSAMENTO ===
+        "log_extracting_iso": "EXTRAINDO ISO",
+        "log_extracting_arc": "DESCOMPACTANDO",
+        "log_compressing": "COMPRIMINDO ZAR",
+        "log_completed": "CONCLUÍDO",
+        "log_failed": "FALHA",
+        "log_cancelled": "CANCELADO",
+
         # === DICAS / TOOLTIPS ===
         "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até o final (.zar) e limpa os resíduos.",
         "tip_extract_arc": "Isolado: Extrai .zip, .rar ou .7z de forma plana (sem pastas aninhadas).",
@@ -165,6 +173,14 @@ TRANSLATIONS = {
         "warn_exit_msg": "There are active background processes running.\nIf you exit now, the program will safely cancel and abort everything.\n\nDo you really want to exit?",
         "btn_exit_yes": "Exit and Abort",
         "btn_exit_no": "Cancel and Return",
+
+        # === STATUS DO PROCESSAMENTO ===
+        "log_extracting_iso": "EXTRACTING ISO",
+        "log_extracting_arc": "EXTRACTING ARCHIVE",
+        "log_compressing": "COMPRESSING ZAR",
+        "log_completed": "COMPLETED",
+        "log_failed": "FAILED",
+        "log_cancelled": "CANCELLED",
 
         # === TIPS / TOOLTIPS ===
         "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar.",
