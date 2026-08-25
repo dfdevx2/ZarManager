@@ -96,12 +96,11 @@ class ZarManagerApp(QMainWindow):
         self.stack.setCurrentWidget(self.main_view)
 
     def closeEvent(self, event: QCloseEvent):
-        # Proteção contra Ghost Processes
         if hasattr(self, 'main_view') and self.main_view.active_threads:
-            title = self.main_view.get_text("warn_exit_title") or "Warning"
-            msg = self.main_view.get_text("warn_exit_msg") or "There are active processes running. Are you sure you want to cancel them and exit?"
-            btn_yes = self.main_view.get_text("btn_exit_yes") or "Exit & Cancel"
-            btn_no = self.main_view.get_text("btn_exit_no") or "Return"
+            title = self.main_view.get_text("warn_exit_title", "Aviso de Encerramento")
+            msg = self.main_view.get_text("warn_exit_msg", "Existem processos ativos em segundo plano.\nSe fechar agora, o programa irá cancelar e abortar tudo de forma segura.\n\nDeseja mesmo sair?")
+            btn_yes = self.main_view.get_text("btn_exit_yes", "Sair e Abortar")
+            btn_no = self.main_view.get_text("btn_exit_no", "Cancelar e Voltar")
             
             resp = DialogManager.ask_custom(self, title, msg, [btn_yes, btn_no])
             
