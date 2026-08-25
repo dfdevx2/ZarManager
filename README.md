@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="img/logo.png" alt="ZarManager Logo" width="250">
+</p>
+
 # ZarManager
 
 ZarManager is a cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
@@ -40,5 +44,3 @@ The final executable will be available in the `dist/` directory.
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
-
----
