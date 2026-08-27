@@ -37,6 +37,9 @@ TRANSLATIONS = {
         # === CONFIGURAÇÕES ===
         "lbl_language": "Idioma da Interface",
         "lbl_theme": "Tema Visual",
+        "theme_system": "Sistema",
+        "theme_black": "Preto",
+        "theme_white": "Branco",
         "lbl_workers": "Threads de Processamento",
         "worker_warning": "Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), resultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.",
         
@@ -141,6 +144,9 @@ TRANSLATIONS = {
         # === SETTINGS ===
         "lbl_language": "Interface Language",
         "lbl_theme": "Visual Theme",
+        "theme_system": "System",
+        "theme_black": "Pitch Black",
+        "theme_white": "White",
         "lbl_workers": "Processing Threads",
         "worker_warning": "Performance Warning: Allocating an excessive number of threads can cause severe disk overload (I/O Bottleneck), resulting in a dramatic loss of speed. It is ideal to keep a moderate value (2 to 4) for hard drives.",
         

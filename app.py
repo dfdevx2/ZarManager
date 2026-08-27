@@ -31,13 +31,11 @@ class ZarManagerApp(QMainWindow):
         app = QApplication.instance()
         sys_os = platform.system()
         
-        # macOS usa tema translúcido nativo, Windows/Linux usam Fusion para garantir estabilidade do design
         if sys_os == "Darwin":
             app.setStyle("macOS")
         else:
             app.setStyle("Fusion")
             
-        # ESTILO GLOBAL DE TOOLTIPS (Balões de dicas elegantes em qualquer SO)
         tooltip_style = """
             QToolTip {
                 background-color: #2c3e50;
@@ -61,9 +59,9 @@ class ZarManagerApp(QMainWindow):
                 
             theme_name = "Preto" if is_dark else "Branco"
 
-        palette = QPalette()
+        # A FUNDAÇÃO ESTÁVEL: Reiniciar sempre as cores usando a base nativa antes de injetar customizações (Isto resolve as misturas de cores no Linux)
+        palette = app.style().standardPalette()
         
-        # Paletas Universais Padronizadas (replicam a leveza que viu no macOS)
         if theme_name == "Preto":
             palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))          
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)

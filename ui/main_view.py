@@ -138,7 +138,6 @@ class MainController(QWidget):
         self._populate_initial_data()
         self.retranslate_ui()
         
-        # Dispara o tutorial apenas se for a primeira vez que entra na interface principal
         if not self.cfg.get("tutorial_done"):
             QTimer.singleShot(800, self._show_tutorial)
 
@@ -298,7 +297,6 @@ class MainController(QWidget):
         
         def on_lang_change(txt):
             self.cfg.set("language", txt)
-            # Imprime uma mensagem nova no idioma correto confirmando a mudança
             self.emit_log(self.get_text("log_lang_changed", "Idioma alterado."), "INFO")
             self.retranslate_ui() 
             
@@ -309,16 +307,11 @@ class MainController(QWidget):
         
         theme_layout = QHBoxLayout()
         self.lbl_set_theme = QLabel()
-        self.cb_theme = QComboBox()
-        self.cb_theme.addItems(["Sistema", "Preto", "Branco", "Steam", "Xbox"])
-        idx_theme = self.cb_theme.findText(self.cfg.get("theme") or "Sistema")
-        if idx_theme >= 0: self.cb_theme.setCurrentIndex(idx_theme)
         
-        def on_theme_change(txt):
-            self.cfg.set("theme", txt)
-            self.apply_theme_cb() 
-            
-        self.cb_theme.currentTextChanged.connect(on_theme_change)
+        # A Nova Caixa Dinâmica de Temas
+        self.cb_theme = QComboBox()
+        self.cb_theme.currentIndexChanged.connect(self._on_theme_index_change)
+        
         theme_layout.addWidget(self.lbl_set_theme)
         theme_layout.addWidget(self.cb_theme)
         theme_layout.addStretch()
@@ -353,6 +346,13 @@ class MainController(QWidget):
         
         return w
 
+    def _on_theme_index_change(self, index):
+        if index >= 0:
+            theme_data = self.cb_theme.itemData(index)
+            if theme_data and theme_data != self.cfg.get("theme"):
+                self.cfg.set("theme", theme_data)
+                self.apply_theme_cb()
+
     def _build_about(self):
         w = QWidget()
         layout = QVBoxLayout(w)
@@ -373,7 +373,6 @@ class MainController(QWidget):
         self.btn_ab_git.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL)))
         layout.addWidget(self.btn_ab_git)
 
-        # --- BOTÃO KO-FI (Link Corrigido) ---
         self.btn_ab_kofi = QPushButton()
         self.btn_ab_kofi.setStyleSheet("""
             QPushButton {
@@ -390,7 +389,6 @@ class MainController(QWidget):
         """)
         self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdx047")))
         layout.addWidget(self.btn_ab_kofi)
-        # ------------------------------------
         
         self.grp_ab_tut = QGroupBox()
         tut_layout = QVBoxLayout(self.grp_ab_tut)
@@ -428,7 +426,6 @@ class MainController(QWidget):
         self.tabs.setTabText(self.settings_idx, self.get_text("tab_settings", "Configurações"))
         self.tabs.setTabText(self.about_idx, self.get_text("tab_about", "Sobre"))
         
-        # Tooltips Globais
         self.tabs.setTabToolTip(0, self.get_text("tip_auto"))
         self.tabs.setTabToolTip(1, self.get_text("tip_extract_arc"))
         self.tabs.setTabToolTip(2, self.get_text("tip_extract"))
@@ -436,6 +433,23 @@ class MainController(QWidget):
         self.cb_theme.setToolTip(self.get_text("tip_theme"))
         self.cb_lang.setToolTip(self.get_text("tip_lang"))
         self.slider_workers.setToolTip(self.get_text("worker_warning"))
+        
+        # Reconstrói as opções de tema com o idioma escolhido
+        current_theme = self.cfg.get("theme") or "Sistema"
+        self.cb_theme.blockSignals(True)
+        self.cb_theme.clear()
+        themes = [
+            ("Sistema", self.get_text("theme_system", "Sistema")),
+            ("Preto", self.get_text("theme_black", "Preto")),
+            ("Branco", self.get_text("theme_white", "Branco")),
+            ("Steam", "Steam"),
+            ("Xbox", "Xbox")
+        ]
+        for data_val, display_text in themes:
+            self.cb_theme.addItem(display_text, data_val)
+            if data_val == current_theme:
+                self.cb_theme.setCurrentIndex(self.cb_theme.count() - 1)
+        self.cb_theme.blockSignals(False)
         
         t_dir = self.get_text("lbl_directories", "Diretórios")
         t_src = self.get_text("lbl_search_source", "Procurar Origem...")
@@ -456,7 +470,6 @@ class MainController(QWidget):
             ui.btn_start.setText(t_sta)
             ui.btn_cancel.setText(t_can)
             
-            # Aplicar tooltips em cada botão
             ui.btn_src.setToolTip(self.get_text("tip_source"))
             ui.btn_tgt.setToolTip(self.get_text("tip_target"))
             ui.btn_invert.setToolTip(self.get_text("tip_invert"))
@@ -469,7 +482,6 @@ class MainController(QWidget):
             else:
                 ui.btn_pause.setText(self.get_text("btn_pause_proc", "⏸ Pausar"))
 
-            # Atualiza dinamicamente o texto da caixa de lista caso o "Nenhum ficheiro" esteja visível
             if ui.list_view.count() == 1:
                 item = ui.list_view.item(0)
                 if not (item.flags() & Qt.ItemFlag.ItemIsUserCheckable):

@@ -97,12 +97,21 @@ jobs:
       - name: Build with Nuitka (macOS DMG)
         if: runner.os == 'macOS'
         run: |
-          python -m nuitka --standalone --macos-create-app-bundle --enable-plugin=pyside6 --include-data-dir=bin=bin --output-dir=dist app.py
+          # Criar pasta para ícone de alta resolução
+          mkdir -p img/icon.iconset
+          # Usar sips nativo do Mac para gerar todas as resoluções do ícone Apple a partir do PNG original
+          sips -z 16 16     img/icon.png --out img/icon.iconset/icon_16x16.png
+          sips -z 32 32     img/icon.png --out img/icon.iconset/icon_16x16@2x.png
+          sips -z 128 128   img/icon.png --out img/icon.iconset/icon_128x128.png
+          sips -z 256 256   img/icon.png --out img/icon.iconset/icon_128x128@2x.png
+          sips -z 256 256   img/icon.png --out img/icon.iconset/icon_256x256.png
+          sips -z 512 512   img/icon.png --out img/icon.iconset/icon_256x256@2x.png
+          iconutil -c icns img/icon.iconset
           
-          # Assinatura Digital Ad-Hoc (Self-Signed do macOS)
+          python -m nuitka --standalone --macos-create-app-bundle --macos-app-icon=img/icon.icns --enable-plugin=pyside6 --include-data-dir=bin=bin --output-dir=dist app.py
+          
           codesign --force --deep -s - dist/app.app
           
-          # Criar Imagem DMG usando o utilitário nativo hdiutil via homebrew
           brew install create-dmg
           create-dmg \
             --volname "ZarManager" \
@@ -149,11 +158,13 @@ jobs:
             This update introduces native Apple ecosystem support, UI design refinements, and community support links.
             
             ### ✨ Key Features & Improvements
-            * **macOS Support (.dmg):** First official release for Apple Silicon and Intel Macs via `.dmg` image bundle, featuring native macOS UI styling and ad-hoc digital signature to bypass basic Gatekeeper constraints.
+            * **macOS Support (.dmg):** First official release for Apple Silicon and Intel Macs via `.dmg` image bundle, featuring native macOS UI styling, custom app icons, and ad-hoc digital signature to bypass basic Gatekeeper constraints.
             * **Ko-fi Integration:** Added a direct support button in the "About" tab for users who wish to donate and support the project's continuous development.
+            * **First Boot Interactive Guide:** Implemented a welcome tutorial overlay that greets new users, explaining tabs and options to streamline onboarding.
+            * **Dynamic Tooltips:** Added sleek, natively styled global tooltips across the UI. Hovering over any element explains its function precisely in real-time.
             * **Smart Threading Logic:** The engine now automatically scales down the maximum worker count to match the number of active files, eliminating ghost threads and unnecessary I/O overhead.
-            * **Refined Light Theme:** Rebuilt the "White" interface theme using softer grays, pure white input boxes, and modern blue accents to prevent contrast fatigue and avoid system-forced dark palette clashes.
-            * **Translation & Localization:** Fixed critical fallback strings and ensured real-time console localization for engine status updates ("Extracting", "Compressing", etc.).
+            * **Theme Engine Stability:** Fixed a critical bug in the Linux PySide6 rendering pipeline where changing visual themes would cause color overlaps and unreadable text. The theme foundation now safely resets the `QPalette` natively per execution.
+            * **Translation & Localization:** The theme dropdown list and list views now correctly retranslate their core texts dynamically without needing an application restart.
             
             ### 📦 Official Binaries
             * `ZarManager-v1.1.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
