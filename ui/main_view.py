@@ -139,7 +139,6 @@ class MainController(QWidget):
         self.retranslate_ui()
 
     def get_text(self, key: str, fallback: str = "") -> str:
-        """Busca a tradução de forma segura. Retorna fallback em português caso não encontre."""
         try:
             lang = self.cfg.get("language") or "pt-br"
             val = locales.get_text(lang, key)
@@ -310,7 +309,6 @@ class MainController(QWidget):
         theme_layout.addWidget(self.cb_theme)
         theme_layout.addStretch()
         
-        # Padrão alterado de 4 para 2
         workers_val = int(self.cfg.get("workers") or 2)
         self.lbl_set_workers = QLabel()
         
@@ -360,6 +358,25 @@ class MainController(QWidget):
         self.btn_ab_git.setStyleSheet("padding: 10px; text-align: left;")
         self.btn_ab_git.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL)))
         layout.addWidget(self.btn_ab_git)
+
+        # --- BOTÃO KO-FI ---
+        self.btn_ab_kofi = QPushButton()
+        self.btn_ab_kofi.setStyleSheet("""
+            QPushButton {
+                background-color: #29abe0;
+                color: white;
+                font-weight: bold;
+                padding: 10px;
+                text-align: left;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1a8fbe;
+            }
+        """)
+        self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdevx2")))
+        layout.addWidget(self.btn_ab_kofi)
+        # -------------------
         
         self.grp_ab_tut = QGroupBox()
         tut_layout = QVBoxLayout(self.grp_ab_tut)
@@ -431,6 +448,7 @@ class MainController(QWidget):
         t_dev = self.get_text("lbl_about_dev", "Desenvolvedor")
         self.lbl_ab_info.setText(f"<b>ZarManager {self.app_version}</b><br><br>💻 {t_dev}: dfdevx2<br>📜 Licença: MIT License")
         self.btn_ab_git.setText(self.get_text("btn_repo", "🌐 Repositório Oficial no GitHub"))
+        self.btn_ab_kofi.setText(self.get_text("btn_kofi", "☕ Apoiar o Projeto no Ko-fi"))
         self.grp_ab_tut.setTitle(self.get_text("lbl_how_to_use", "Como Usar"))
         self.lbl_ab_tut.setText(self.get_text("about_tutorial", "Selecione o diretório, marque os itens e inicie."))
         self.chk_auto_upd.setText(self.get_text("lbl_auto_update", "Procurar Atualizações Automáticas"))
@@ -559,7 +577,6 @@ class MainController(QWidget):
         txt_proc = self.get_text("lbl_processed", "processados")
         ui.lbl_counter.setText(f"0 / {len(req.items)} {txt_proc}")
 
-        # Padrão alterado de 4 para 2
         workers = int(self.cfg.get("workers") or 2)
         worker = CoreWorkerThread(req, workers, self)
         

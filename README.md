@@ -2,6 +2,10 @@
   <img src="img/logo.png" alt="ZarManager Logo" width="250">
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/dfdevx2"><img src="https://img.shields.io/badge/Ko--fi-Donate-29abe0?style=for-the-badge&logo=ko-fi" alt="Ko-fi"></a>
+</p>
+
 # ZarManager
 
 ZarManager is a cross-platform graphical tool designed to automate XISO extraction and batch compression into `.zar` archives.
@@ -20,9 +24,9 @@ ZarManager is a cross-platform graphical tool designed to automate XISO extracti
 ## Key Features
 
 * **Automated Pipeline:** Reads directories, identifies `.zip`, `.rar`, `.7z`, and `.iso` files, runs cascading extractions, and compresses the final output autonomously.
-* **Multi-Threaded Performance:** Flexible worker configuration for concurrent extraction and compression adapted to your hardware, maximizing disk utilization.
+* **Multi-Threaded Performance:** Flexible worker configuration for concurrent extraction and compression adapted to your hardware, maximizing disk utilization. Features smart thread clamping to avoid ghost processes.
 * **Native Stability:** Built with **PySide6 (Qt)** featuring strict asynchronous background execution (`QThread`), ensuring absolute fluidity across Windows, Linux (X11/Wayland), and macOS.
-* **Dynamic Interface:** Real-time support for multiple visual themes (AMOLED, Steam, Xbox, Light) and languages (PT-BR, EN) without restarting.
+* **Dynamic Interface:** Real-time support for multiple visual themes (AMOLED, Steam, Xbox, Light, macOS Native) and languages (PT-BR, EN) without restarting.
 * **Data Safety:** Automatic handling of file collisions with granular options for overwriting and preserving source files.
 * **AI-Assisted Debugging:** Codebase concurrency management, thread synchronization, and error handling were rigorously debugged and refined with the assistance of Artificial Intelligence.
 

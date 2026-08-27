@@ -29,17 +29,20 @@ class ZarManagerApp(QMainWindow):
 
     def apply_theme(self):
         app = QApplication.instance()
-        app.setStyle("Fusion")
+        sys_os = platform.system()
+        
+        # macOS usa tema translúcido nativo, Windows/Linux usam Fusion
+        if sys_os == "Darwin":
+            app.setStyle("macOS")
+        else:
+            app.setStyle("Fusion")
         
         theme_name = self.cfg.get("theme") or "Sistema"
         
-        # --- DETEÇÃO INTELIGENTE DO SISTEMA ---
         if theme_name == "Sistema":
             try:
-                # Tenta usar a funcionalidade nativa do PySide6 (Qt 6.5+)
                 is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
             except AttributeError:
-                # Fallback de segurança para versões mais antigas
                 is_dark = app.style().standardPalette().color(QPalette.Window).lightness() < 128
                 
             theme_name = "Preto" if is_dark else "Branco"
@@ -47,7 +50,6 @@ class ZarManagerApp(QMainWindow):
         palette = QPalette()
         
         if theme_name == "Preto":
-            # TEMA AMOLED (Preto Absoluto)
             palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))          
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(8, 8, 8))            
@@ -63,23 +65,21 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
             
         elif theme_name == "Branco":
-            # TEMA BRANCO SUAVE (Com destaques em Azul Claro Moderno)
-            palette.setColor(QPalette.ColorRole.Window, QColor(240, 242, 245))       # Fundo cinza super leve (agradável)
-            palette.setColor(QPalette.ColorRole.WindowText, QColor(40, 40, 40))      # Texto escuro (mas não preto 100%)
-            palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))         # Branco puro (para caixas de texto/listas)
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(248, 249, 250))# Efeito zebra subtil
+            palette.setColor(QPalette.ColorRole.Window, QColor(240, 242, 245))       
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(40, 40, 40))      
+            palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))         
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(248, 249, 250))
             palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
             palette.setColor(QPalette.ColorRole.ToolTipText, QColor(40, 40, 40))
             palette.setColor(QPalette.ColorRole.Text, QColor(40, 40, 40))
-            palette.setColor(QPalette.ColorRole.Button, QColor(230, 230, 230))       # Botões num tom de cinza claro
+            palette.setColor(QPalette.ColorRole.Button, QColor(230, 230, 230))       
             palette.setColor(QPalette.ColorRole.ButtonText, QColor(40, 40, 40))
             palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(52, 152, 219))          # Azul claro de destaque
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(52, 152, 219))     # Azul claro de destaque
+            palette.setColor(QPalette.ColorRole.Link, QColor(52, 152, 219))          
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(52, 152, 219))     
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
             
         elif theme_name == "Steam":
-            # TEMA STEAM (Azul Profundo)
             palette.setColor(QPalette.ColorRole.Window, QColor(15, 24, 34))
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 14, 19))         
@@ -95,7 +95,6 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
 
         elif theme_name == "Xbox":
-            # TEMA XBOX (Verde Profundo)
             palette.setColor(QPalette.ColorRole.Window, QColor(15, 34, 18))
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 19, 12))         
