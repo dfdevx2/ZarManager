@@ -31,6 +31,7 @@ class ZarManagerApp(QMainWindow):
         app = QApplication.instance()
         sys_os = platform.system()
         
+        # macOS usa tema translúcido nativo, Windows/Linux usam Fusion
         if sys_os == "Darwin":
             app.setStyle("macOS")
         else:
@@ -51,76 +52,91 @@ class ZarManagerApp(QMainWindow):
         
         theme_name = self.cfg.get("theme") or "Sistema"
         
+        # RESET DA PALETA NO LINUX/WINDOWS PARA EVITAR SOBREPOSIÇÃO DE CORES
+        if sys_os != "Darwin":
+            app.setPalette(app.style().standardPalette())
+            
+        palette = app.palette()
+        
         if theme_name == "Sistema":
             try:
                 is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
             except AttributeError:
-                is_dark = app.style().standardPalette().color(QPalette.Window).lightness() < 128
-                
+                is_dark = palette.color(QPalette.Window).lightness() < 128
             theme_name = "Preto" if is_dark else "Branco"
 
-        # A FUNDAÇÃO ESTÁVEL: Reiniciar sempre as cores usando a base nativa antes de injetar customizações (Isto resolve as misturas de cores no Linux)
-        palette = app.style().standardPalette()
-        
         if theme_name == "Preto":
-            palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))          
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(8, 8, 8))            
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(15, 15, 15))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(15, 15, 15))       
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(138, 43, 226))       
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(138, 43, 226))  
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.Window, QColor(12, 12, 12))          
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(6, 6, 6))            
+            palette.setColor(QPalette.AlternateBase, QColor(16, 16, 16))
+            palette.setColor(QPalette.ToolTipBase, QColor(44, 62, 80))
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, Qt.white)
+            palette.setColor(QPalette.Button, QColor(22, 22, 22))       
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, QColor(138, 43, 226))       
+            palette.setColor(QPalette.Highlight, QColor(138, 43, 226))  
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            # Definir cores de desativado previne textos ilegíveis no Linux
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(120, 120, 120))
+            palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(120, 120, 120))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(120, 120, 120))
             
         elif theme_name == "Branco":
-            palette.setColor(QPalette.ColorRole.Window, QColor(240, 242, 245))       
-            palette.setColor(QPalette.ColorRole.WindowText, QColor(40, 40, 40))      
-            palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))         
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(248, 249, 250))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, QColor(40, 40, 40))
-            palette.setColor(QPalette.ColorRole.Button, QColor(230, 230, 230))       
-            palette.setColor(QPalette.ColorRole.ButtonText, QColor(40, 40, 40))
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(52, 152, 219))          
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(52, 152, 219))     
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.Window, QColor(245, 246, 248))       
+            palette.setColor(QPalette.WindowText, QColor(30, 30, 30))      
+            palette.setColor(QPalette.Base, QColor(255, 255, 255))         
+            palette.setColor(QPalette.AlternateBase, QColor(238, 240, 242))
+            palette.setColor(QPalette.ToolTipBase, QColor(44, 62, 80))
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, QColor(30, 30, 30))
+            palette.setColor(QPalette.Button, QColor(230, 232, 235))       
+            palette.setColor(QPalette.ButtonText, QColor(30, 30, 30))
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, QColor(52, 152, 219))          
+            palette.setColor(QPalette.Highlight, QColor(52, 152, 219))     
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(150, 150, 150))
+            palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(150, 150, 150))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(150, 150, 150))
             
         elif theme_name == "Steam":
-            palette.setColor(QPalette.ColorRole.Window, QColor(15, 24, 34))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(11, 14, 19))         
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 35, 50))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(25, 45, 60))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(64, 150, 200))      
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(64, 150, 200)) 
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
+            palette.setColor(QPalette.Window, QColor(23, 29, 37))
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(13, 19, 27))         
+            palette.setColor(QPalette.AlternateBase, QColor(27, 40, 56))
+            palette.setColor(QPalette.ToolTipBase, QColor(44, 62, 80))
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, Qt.white)
+            palette.setColor(QPalette.Button, QColor(42, 71, 94))
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, QColor(102, 192, 244))      
+            palette.setColor(QPalette.Highlight, QColor(102, 192, 244)) 
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(100, 120, 140))
+            palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(100, 120, 140))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 120, 140))
 
         elif theme_name == "Xbox":
-            palette.setColor(QPalette.ColorRole.Window, QColor(15, 34, 18))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(11, 19, 12))         
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 50, 25))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(25, 60, 30))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(16, 124, 16))        
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(16, 124, 16))   
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.Window, QColor(16, 30, 18))
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(10, 20, 12))         
+            palette.setColor(QPalette.AlternateBase, QColor(20, 40, 25))
+            palette.setColor(QPalette.ToolTipBase, QColor(44, 62, 80))
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, Qt.white)
+            palette.setColor(QPalette.Button, QColor(26, 60, 32))
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, QColor(16, 124, 16))        
+            palette.setColor(QPalette.Highlight, QColor(16, 124, 16))   
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(100, 130, 110))
+            palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(100, 130, 110))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 130, 110))
 
         app.setPalette(palette)
 

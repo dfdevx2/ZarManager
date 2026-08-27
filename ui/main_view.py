@@ -308,7 +308,6 @@ class MainController(QWidget):
         theme_layout = QHBoxLayout()
         self.lbl_set_theme = QLabel()
         
-        # A Nova Caixa Dinâmica de Temas
         self.cb_theme = QComboBox()
         self.cb_theme.currentIndexChanged.connect(self._on_theme_index_change)
         
@@ -434,14 +433,13 @@ class MainController(QWidget):
         self.cb_lang.setToolTip(self.get_text("tip_lang"))
         self.slider_workers.setToolTip(self.get_text("worker_warning"))
         
-        # Reconstrói as opções de tema com o idioma escolhido
         current_theme = self.cfg.get("theme") or "Sistema"
         self.cb_theme.blockSignals(True)
         self.cb_theme.clear()
         themes = [
-            ("Sistema", self.get_text("theme_system", "Sistema")),
-            ("Preto", self.get_text("theme_black", "Preto")),
-            ("Branco", self.get_text("theme_white", "Branco")),
+            ("Sistema", self.get_text("theme_system", "System")),
+            ("Preto", self.get_text("theme_black", "Pitch Black")),
+            ("Branco", self.get_text("theme_white", "White")),
             ("Steam", "Steam"),
             ("Xbox", "Xbox")
         ]

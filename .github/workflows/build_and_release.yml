@@ -97,9 +97,7 @@ jobs:
       - name: Build with Nuitka (macOS DMG)
         if: runner.os == 'macOS'
         run: |
-          # Criar pasta para ícone de alta resolução
           mkdir -p img/icon.iconset
-          # Usar sips nativo do Mac para gerar todas as resoluções do ícone Apple a partir do PNG original
           sips -z 16 16     img/icon.png --out img/icon.iconset/icon_16x16.png
           sips -z 32 32     img/icon.png --out img/icon.iconset/icon_16x16@2x.png
           sips -z 128 128   img/icon.png --out img/icon.iconset/icon_128x128.png
