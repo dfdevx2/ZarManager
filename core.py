@@ -38,11 +38,22 @@ class ZarManagerCore:
         self.bin_dir = self.base_dir / "bin"
         sys_os = platform.system()
         
+        # Ramificação específica e precisa para cada Sistema Operativo
         if sys_os == "Windows":
             self.xiso_bin = self.bin_dir / "extract-xiso.exe"
             self.zar_bin = self.bin_dir / "zarchive.exe"
             self.bin_7z = self.bin_dir / "7z.exe" 
-        else:
+        elif sys_os == "Darwin":  # macOS
+            self.xiso_bin = self.bin_dir / "extract-xiso-mac"
+            self.zar_bin = self.bin_dir / "zarchive-mac"
+            # O macOS geralmente usa o binário '7zz' (Universal/ARM64)
+            self.bin_7z = self.bin_dir / "7zz"
+            
+            if not self.bin_7z.exists() and shutil.which("7zz"):
+                self.bin_7z = Path(shutil.which("7zz"))
+            elif not self.bin_7z.exists() and shutil.which("7z"):
+                self.bin_7z = Path(shutil.which("7z"))
+        else:  # Linux e outros
             self.xiso_bin = self.bin_dir / "extract-xiso"
             self.zar_bin = self.bin_dir / "zarchive"
             self.bin_7z = self.bin_dir / "7z" 
@@ -53,13 +64,13 @@ class ZarManagerCore:
     def verify_environment(self) -> bool:
         missing = []
         if self.mode in ['auto', 'extract'] and not self.xiso_bin.exists():
-            missing.append("extract-xiso")
+            missing.append(f"{self.xiso_bin.name}")
         if self.mode in ['auto', 'compress'] and not self.zar_bin.exists():
-            missing.append("zarchive")
+            missing.append(f"{self.zar_bin.name}")
             
         has_archives = any(p.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz'] for p in self.items)
         if (self.mode == 'extract_arc' or has_archives) and not self.bin_7z.exists():
-            missing.append("7-Zip (7z / 7z.exe)")
+            missing.append(f"{self.bin_7z.name}")
 
         if missing:
             self.log(f"[ERRO AMBIENTAL] Binários ausentes: {', '.join(missing)}")
@@ -82,7 +93,6 @@ class ZarManagerCore:
         self.log("[SISTEMA] Abortando fila...")
 
     def start_processing(self):
-        # TRAVA INTELIGENTE: Reduz os workers para coincidir com os ficheiros se a fila for mais pequena
         actual_workers = min(self.max_workers, len(self.items))
         if actual_workers < 1: 
             actual_workers = 1 
@@ -130,6 +140,12 @@ class ZarManagerCore:
             return 0.0, 1.0
 
         try:
+            # Permissão de execução no Mac/Linux para garantir que o binário pode rodar
+            if platform.system() != "Windows":
+                if self.bin_7z.exists(): os.chmod(str(self.bin_7z), 0o755)
+                if self.xiso_bin.exists(): os.chmod(str(self.xiso_bin), 0o755)
+                if self.zar_bin.exists(): os.chmod(str(self.zar_bin), 0o755)
+
             if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
                 temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
                 cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
