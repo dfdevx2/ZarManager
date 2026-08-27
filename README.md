@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <img src="[https://img.shields.io/github/v/release/dfdevx2/ZarManager?style=for-the-badge&color=2ecc71](https://img.shields.io/github/v/release/dfdevx2/ZarManager?style=for-the-badge&color=2ecc71)" alt="Release">
-  <img src="[https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)" alt="Python">
-  <img src="[https://img.shields.io/badge/Qt-PySide6-41CD52?style=for-the-badge&logo=qt&logoColor=white](https://img.shields.io/badge/Qt-PySide6-41CD52?style=for-the-badge&logo=qt&logoColor=white)" alt="Qt">
-  <a href="[https://ko-fi.com/dfdx047](https://ko-fi.com/dfdx047)"><img src="[https://img.shields.io/badge/Ko--fi-Donate-29abe0?style=for-the-badge&logo=ko-fi](https://img.shields.io/badge/Ko--fi-Donate-29abe0?style=for-the-badge&logo=ko-fi)" alt="Ko-fi"></a>
+  <a href="https://github.com/dfdevx2/ZarManager/releases"><img src="https://img.shields.io/github/v/release/dfdevx2/ZarManager?style=for-the-badge&color=2ecc71" alt="Release"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://doc.qt.io/qtforpython-6/"><img src="https://img.shields.io/badge/Qt-PySide6-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="Qt"></a>
+  <a href="https://ko-fi.com/dfdx047"><img src="https://img.shields.io/badge/Ko--fi-Donate-29abe0?style=for-the-badge&logo=ko-fi" alt="Ko-fi"></a>
 </p>
 
 # ZarManager
@@ -70,7 +70,7 @@ The project uses Nuitka to compile standalone native binaries. To compile the ap
 
 1. Clone the repository and setup the Python environment:
     ```bash
-    git clone https://github.com/dfdevx2/ZarManager.git
+    git clone [https://github.com/dfdevx2/ZarManager.git](https://github.com/dfdevx2/ZarManager.git)
     cd ZarManager
     python -m venv venv
     source venv/bin/activate  # On Windows: venv\Scripts\activate
