@@ -32,99 +32,101 @@ class ZarManagerApp(QMainWindow):
         sys_os = platform.system()
         theme_name = self.cfg.get("theme") or "Sistema"
         
-        # O Mac foi totalmente isolado num ficheiro próprio para não afetar o Linux
+        # 1. Limpa estilos anteriores para evitar conflitos residuais de memória
+        app.setStyleSheet("")
+        
+        # 2. Isolamento Estrito por Sistema Operacional
         if sys_os == "Darwin":
             from ui.theme_mac import apply_mac_theme
             apply_mac_theme(app, theme_name)
-            return
-            
-        # --- ESTRUTURA DE TEMAS ORIGINAL (Windows & Linux) ---
-        app.setStyle("Fusion")
-        
-        tooltip_style = """
-            QToolTip {
-                background-color: #2c3e50;
-                color: #ffffff;
-                border: 1px solid #34495e;
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-family: "Segoe UI", Roboto, Arial;
-                font-size: 13px;
-            }
-        """
-        app.setStyleSheet(tooltip_style)
-        
-        if sys_os == "Linux" and theme_name == "Sistema":
-            theme_name = "Preto"
-            
-        if theme_name == "Sistema":
-            try:
-                is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
-            except AttributeError:
-                is_dark = app.style().standardPalette().color(QPalette.Window).lightness() < 128
-            theme_name = "Preto" if is_dark else "Branco"
-
-        # Arquitetura Original: Usa uma paleta virgem para os escuros
-        palette = QPalette()
-        
-        if theme_name == "Preto":
-            palette.setColor(QPalette.ColorRole.Window, QColor(12, 12, 12))          
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(6, 6, 6))            
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(16, 16, 16))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(22, 22, 22))       
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(138, 43, 226))       
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(138, 43, 226))  
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.Text, QColor(120, 120, 120))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.WindowText, QColor(120, 120, 120))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.ButtonText, QColor(120, 120, 120))
-            
-        elif theme_name == "Steam":
-            palette.setColor(QPalette.ColorRole.Window, QColor(23, 29, 37))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(13, 19, 27))         
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(27, 40, 56))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(42, 71, 94))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(102, 192, 244))      
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(102, 192, 244)) 
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.Text, QColor(100, 120, 140))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.WindowText, QColor(100, 120, 140))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.ButtonText, QColor(100, 120, 140))
-
-        elif theme_name == "Xbox":
-            palette.setColor(QPalette.ColorRole.Window, QColor(16, 30, 18))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(10, 20, 12))         
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 40, 25))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(26, 60, 32))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(16, 124, 16))        
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(16, 124, 16))   
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.Text, QColor(100, 130, 110))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.WindowText, QColor(100, 130, 110))
-            palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.ButtonText, QColor(100, 130, 110))
-            
         else:
-            # Arquitetura Original: Modifica a paleta standard se for "Branco", prevenindo sobreposições
+            # Arquitetura Original Windows / Linux
+            app.setStyle("Fusion")
+            
+            tooltip_style = """
+                QToolTip {
+                    background-color: #2c3e50;
+                    color: #ffffff;
+                    border: 1px solid #34495e;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    font-family: "Segoe UI", Roboto, Arial;
+                    font-size: 13px;
+                }
+            """
+            app.setStyleSheet(tooltip_style)
+            
+            if sys_os == "Linux" and theme_name == "Sistema":
+                theme_name = "Preto"
+                
+            if theme_name == "Sistema":
+                try:
+                    is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
+                except AttributeError:
+                    is_dark = app.style().standardPalette().color(QPalette.ColorRole.Window).lightness() < 128
+                theme_name = "Preto" if is_dark else "Branco"
+
+            # Base limpa do sistema para evitar artefatos
             palette = app.style().standardPalette()
-            if theme_name == "Branco":
+            
+            if theme_name == "Preto":
+                palette.setColor(QPalette.ColorRole.Window, QColor(12, 12, 12))          
+                palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Base, QColor(6, 6, 6))            
+                palette.setColor(QPalette.ColorRole.AlternateBase, QColor(16, 16, 16))
+                palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
+                palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Button, QColor(22, 22, 22))       
+                palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+                palette.setColor(QPalette.ColorRole.Link, QColor(138, 43, 226))       
+                palette.setColor(QPalette.ColorRole.Highlight, QColor(138, 43, 226))  
+                palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+                
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(120, 120, 120))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(120, 120, 120))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(120, 120, 120))
+                
+            elif theme_name == "Steam":
+                palette.setColor(QPalette.ColorRole.Window, QColor(23, 29, 37))
+                palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Base, QColor(13, 19, 27))         
+                palette.setColor(QPalette.ColorRole.AlternateBase, QColor(27, 40, 56))
+                palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
+                palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Button, QColor(42, 71, 94))
+                palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+                palette.setColor(QPalette.ColorRole.Link, QColor(102, 192, 244))      
+                palette.setColor(QPalette.ColorRole.Highlight, QColor(102, 192, 244)) 
+                palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
+                
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(100, 120, 140))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(100, 120, 140))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(100, 120, 140))
+
+            elif theme_name == "Xbox":
+                palette.setColor(QPalette.ColorRole.Window, QColor(16, 30, 18))
+                palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Base, QColor(10, 20, 12))         
+                palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 40, 25))
+                palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
+                palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.Button, QColor(26, 60, 32))
+                palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+                palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+                palette.setColor(QPalette.ColorRole.Link, QColor(16, 124, 16))        
+                palette.setColor(QPalette.ColorRole.Highlight, QColor(16, 124, 16))   
+                palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+                
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(100, 130, 110))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(100, 130, 110))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(100, 130, 110))
+                
+            elif theme_name == "Branco":
                 palette.setColor(QPalette.ColorRole.Window, QColor(245, 246, 248))       
                 palette.setColor(QPalette.ColorRole.WindowText, QColor(30, 30, 30))      
                 palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))         
@@ -138,11 +140,20 @@ class ZarManagerApp(QMainWindow):
                 palette.setColor(QPalette.ColorRole.Link, QColor(52, 152, 219))          
                 palette.setColor(QPalette.ColorRole.Highlight, QColor(52, 152, 219))     
                 palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
-                palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.Text, QColor(150, 150, 150))
-                palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.WindowText, QColor(150, 150, 150))
-                palette.setColor(QPalette.ColorRole.Disabled, QPalette.ColorRole.ButtonText, QColor(150, 150, 150))
+                
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(150, 150, 150))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(150, 150, 150))
+                palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(150, 150, 150))
 
-        app.setPalette(palette)
+            app.setPalette(palette)
+
+        # 3. Força a atualização visual imediata de TODOS os widgets abertos
+        # A sintaxe correta no PySide6 exige o uso do objeto QStyle para aplicar a repintura
+        current_style = app.style()
+        for widget in app.allWidgets():
+            current_style.unpolish(widget)
+            current_style.polish(widget)
+            widget.update()
 
     def boot_main_app(self):
         self.cfg.set("first_boot_done", True)
