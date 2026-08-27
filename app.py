@@ -31,11 +31,25 @@ class ZarManagerApp(QMainWindow):
         app = QApplication.instance()
         sys_os = platform.system()
         
-        # macOS usa tema translúcido nativo, Windows/Linux usam Fusion
+        # macOS usa tema translúcido nativo, Windows/Linux usam Fusion para garantir estabilidade do design
         if sys_os == "Darwin":
             app.setStyle("macOS")
         else:
             app.setStyle("Fusion")
+            
+        # ESTILO GLOBAL DE TOOLTIPS (Balões de dicas elegantes em qualquer SO)
+        tooltip_style = """
+            QToolTip {
+                background-color: #2c3e50;
+                color: #ffffff;
+                border: 1px solid #34495e;
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-family: -apple-system, "Segoe UI", Roboto, Arial;
+                font-size: 13px;
+            }
+        """
+        app.setStyleSheet(tooltip_style)
         
         theme_name = self.cfg.get("theme") or "Sistema"
         
@@ -49,12 +63,13 @@ class ZarManagerApp(QMainWindow):
 
         palette = QPalette()
         
+        # Paletas Universais Padronizadas (replicam a leveza que viu no macOS)
         if theme_name == "Preto":
             palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0))          
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(8, 8, 8))            
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(15, 15, 15))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(0, 0, 0))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
             palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Button, QColor(15, 15, 15))       
@@ -69,8 +84,8 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.WindowText, QColor(40, 40, 40))      
             palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))         
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(248, 249, 250))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
-            palette.setColor(QPalette.ColorRole.ToolTipText, QColor(40, 40, 40))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
+            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Text, QColor(40, 40, 40))
             palette.setColor(QPalette.ColorRole.Button, QColor(230, 230, 230))       
             palette.setColor(QPalette.ColorRole.ButtonText, QColor(40, 40, 40))
@@ -84,7 +99,7 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 14, 19))         
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 35, 50))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(11, 14, 19))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
             palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Button, QColor(25, 45, 60))
@@ -99,7 +114,7 @@ class ZarManagerApp(QMainWindow):
             palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Base, QColor(11, 19, 12))         
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(20, 50, 25))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(11, 19, 12))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(44, 62, 80))
             palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.Button, QColor(25, 60, 30))

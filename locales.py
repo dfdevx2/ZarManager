@@ -9,10 +9,12 @@ TRANSLATIONS = {
         "tab_settings": "Configurações",
         "tab_about": "Sobre",
         
-        # === TELA DE BOAS-VINDAS ===
+        # === TELA DE BOAS-VINDAS & TUTORIAL ===
         "msg_welcome": "Bem-vindo",
         "msg_choose_theme": "Escolha o tema visual inicial:",
         "btn_continue": "Continuar",
+        "tut_title": "Guia de Iniciação Rápida 🚀",
+        "tut_msg": "Bem-vindo ao ZarManager!\n\nPara começar, escolha o modo de operação nas abas superiores.\n\n1. Selecione a sua pasta de Origem (onde estão os seus ficheiros) e a de Destino.\n2. Marque os itens na lista que deseja processar.\n3. Pressione 'Iniciar Processamento'!\n\n💡 DICA DE OURO: Se tiver dúvidas sobre o que um botão ou opção faz, deixe o rato parado sobre ele durante 2 segundos e uma bolha explicativa irá aparecer.\n\nBom trabalho!",
         
         # === INTERFACE PRINCIPAL ===
         "lbl_directories": "Diretórios",
@@ -52,6 +54,7 @@ TRANSLATIONS = {
         
         # === SISTEMA E ATUALIZAÇÕES ===
         "log_ready": "Sistema pronto para operação. Listagem otimizada nativa ativa.",
+        "log_lang_changed": "Idioma da interface alterado com sucesso.",
         "msg_checking_update": "Consultando os servidores do GitHub...",
         "msg_update_avail": "Nova versão ({}) disponível!",
         "msg_update_latest": "O sistema está atualizado (Versão {}).",
@@ -87,15 +90,18 @@ TRANSLATIONS = {
         "log_cancelled": "CANCELADO",
 
         # === DICAS / TOOLTIPS ===
-        "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até o final (.zar) e limpa os resíduos.",
-        "tip_extract_arc": "Isolado: Extrai .zip, .rar ou .7z de forma plana (sem pastas aninhadas).",
-        "tip_extract": "Isolado: Extrai os arquivos da ISO (XDVDFS) para uma pasta.",
-        "tip_compress": "Isolado: Compacta uma pasta extraída para o formato .zar.",
-        "tip_source": "Selecione a pasta onde os arquivos originais estão.",
-        "tip_target": "Selecione a pasta onde os finalizados devem ser salvos.",
-        "tip_start": "Inicia o processamento massivo.",
-        "tip_pause": "Congela a fila.",
-        "tip_cancel": "Cancela e limpa operações em andamento."
+        "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até ao formato .zar e limpa resíduos.",
+        "tip_extract_arc": "Modo Isolado: Extrai .zip, .rar ou .7z de forma limpa.",
+        "tip_extract": "Modo Isolado: Extrai os arquivos internos da ISO (XDVDFS) para uma pasta.",
+        "tip_compress": "Modo Isolado: Compacta uma pasta já extraída para o formato .zar.",
+        "tip_source": "Clique para escolher a pasta onde estão os ficheiros que deseja processar.",
+        "tip_target": "Clique para escolher a pasta onde os ficheiros prontos devem ser guardados.",
+        "tip_invert": "Inverte a seleção atual dos itens na lista acima.",
+        "tip_start": "Inicia o processamento da fila com base nos itens marcados.",
+        "tip_pause": "Congela o processamento atual. Pode retomar a qualquer altura.",
+        "tip_cancel": "Cancela a fila e limpa os ficheiros incompletos de forma segura.",
+        "tip_theme": "Altera o esquema de cores. Pode exigir reiniciar o programa para aplicar paletas nativas.",
+        "tip_lang": "Muda a linguagem da interface e dos logs em tempo real."
     },
     "en": {
         # === TITLES AND TABS ===
@@ -107,10 +113,12 @@ TRANSLATIONS = {
         "tab_settings": "Settings",
         "tab_about": "About",
         
-        # === WELCOME SCREEN ===
+        # === WELCOME SCREEN & TUTORIAL ===
         "msg_welcome": "Welcome",
         "msg_choose_theme": "Choose your initial visual theme:",
         "btn_continue": "Continue",
+        "tut_title": "Quick Start Guide 🚀",
+        "tut_msg": "Welcome to ZarManager!\n\nTo get started, pick an operation mode from the top tabs.\n\n1. Select your Source folder (where your files are) and your Target folder.\n2. Check the items you want to process in the list.\n3. Click 'Start Processing'!\n\n💡 PRO TIP: If you're ever unsure about what a button or option does, leave your mouse over it for 2 seconds and a beautiful tooltip will appear.\n\nHappy processing!",
         
         # === MAIN INTERFACE ===
         "lbl_directories": "Directories",
@@ -150,6 +158,7 @@ TRANSLATIONS = {
         
         # === SYSTEM AND UPDATES ===
         "log_ready": "System ready for operation. Optimized native listing active.",
+        "log_lang_changed": "Interface language changed successfully.",
         "msg_checking_update": "Querying GitHub servers...",
         "msg_update_avail": "New version ({}) available!",
         "msg_update_latest": "System is up to date (Version {}).",
@@ -185,15 +194,18 @@ TRANSLATIONS = {
         "log_cancelled": "CANCELLED",
 
         # === TIPS / TOOLTIPS ===
-        "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar.",
-        "tip_extract_arc": "Isolated: Extracts archives flatly (no nested folders).",
-        "tip_extract": "Isolated: Extracts ISO files (XDVDFS) to a folder.",
-        "tip_compress": "Isolated: Compresses an extracted folder to .zar format.",
-        "tip_source": "Select the folder where the original files are located.",
-        "tip_target": "Select the folder where the finished files should be saved.",
-        "tip_start": "Starts mass processing.",
-        "tip_pause": "Freezes the queue.",
-        "tip_cancel": "Cancels and cleans up ongoing operations."
+        "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar format.",
+        "tip_extract_arc": "Isolated Mode: Extracts archives flatly (no nested folders).",
+        "tip_extract": "Isolated Mode: Extracts ISO files (XDVDFS) to a folder.",
+        "tip_compress": "Isolated Mode: Compresses an extracted folder to .zar format.",
+        "tip_source": "Click to select the folder where your original files are located.",
+        "tip_target": "Click to select the folder where the finished files should be saved.",
+        "tip_invert": "Quickly inverts the selection of items in the list above.",
+        "tip_start": "Starts processing the queue based on the checked items.",
+        "tip_pause": "Freezes the current processing. You can resume at any time.",
+        "tip_cancel": "Cancels the queue and safely deletes incomplete temporary files.",
+        "tip_theme": "Changes the visual theme. Some native palettes may require an app restart.",
+        "tip_lang": "Changes the interface and log language in real time."
     }
 }
 

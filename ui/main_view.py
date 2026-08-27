@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, 
     QPushButton, QLineEdit, QListWidget, QListWidgetItem,
-    QProgressBar, QTextEdit, QGroupBox, QComboBox, QSlider, QCheckBox
+    QProgressBar, QTextEdit, QGroupBox, QComboBox, QSlider, QCheckBox, QMessageBox
 )
 from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QTimer
 from PySide6.QtGui import QFont, QDesktopServices
@@ -137,6 +137,10 @@ class MainController(QWidget):
         self._build_ui()
         self._populate_initial_data()
         self.retranslate_ui()
+        
+        # Dispara o tutorial apenas se for a primeira vez que entra na interface principal
+        if not self.cfg.get("tutorial_done"):
+            QTimer.singleShot(800, self._show_tutorial)
 
     def get_text(self, key: str, fallback: str = "") -> str:
         try:
@@ -147,6 +151,14 @@ class MainController(QWidget):
             return val
         except Exception:
             return fallback if fallback else key
+
+    def _show_tutorial(self):
+        msg = QMessageBox(self)
+        msg.setWindowTitle(self.get_text("tut_title", "Guia Rápido"))
+        msg.setText(self.get_text("tut_msg", "Bem-vindo ao ZarManager!\n..."))
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.exec()
+        self.cfg.set("tutorial_done", True)
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
@@ -286,6 +298,8 @@ class MainController(QWidget):
         
         def on_lang_change(txt):
             self.cfg.set("language", txt)
+            # Imprime uma mensagem nova no idioma correto confirmando a mudança
+            self.emit_log(self.get_text("log_lang_changed", "Idioma alterado."), "INFO")
             self.retranslate_ui() 
             
         self.cb_lang.currentTextChanged.connect(on_lang_change)
@@ -359,7 +373,7 @@ class MainController(QWidget):
         self.btn_ab_git.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL)))
         layout.addWidget(self.btn_ab_git)
 
-        # --- BOTÃO KO-FI ---
+        # --- BOTÃO KO-FI (Link Corrigido) ---
         self.btn_ab_kofi = QPushButton()
         self.btn_ab_kofi.setStyleSheet("""
             QPushButton {
@@ -374,9 +388,9 @@ class MainController(QWidget):
                 background-color: #1a8fbe;
             }
         """)
-        self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdevx2")))
+        self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdx047")))
         layout.addWidget(self.btn_ab_kofi)
-        # -------------------
+        # ------------------------------------
         
         self.grp_ab_tut = QGroupBox()
         tut_layout = QVBoxLayout(self.grp_ab_tut)
@@ -414,6 +428,15 @@ class MainController(QWidget):
         self.tabs.setTabText(self.settings_idx, self.get_text("tab_settings", "Configurações"))
         self.tabs.setTabText(self.about_idx, self.get_text("tab_about", "Sobre"))
         
+        # Tooltips Globais
+        self.tabs.setTabToolTip(0, self.get_text("tip_auto"))
+        self.tabs.setTabToolTip(1, self.get_text("tip_extract_arc"))
+        self.tabs.setTabToolTip(2, self.get_text("tip_extract"))
+        self.tabs.setTabToolTip(3, self.get_text("tip_compress"))
+        self.cb_theme.setToolTip(self.get_text("tip_theme"))
+        self.cb_lang.setToolTip(self.get_text("tip_lang"))
+        self.slider_workers.setToolTip(self.get_text("worker_warning"))
+        
         t_dir = self.get_text("lbl_directories", "Diretórios")
         t_src = self.get_text("lbl_search_source", "Procurar Origem...")
         t_tgt = self.get_text("lbl_search_target", "Procurar Destino...")
@@ -432,10 +455,25 @@ class MainController(QWidget):
             ui.btn_invert.setText(t_inv)
             ui.btn_start.setText(t_sta)
             ui.btn_cancel.setText(t_can)
+            
+            # Aplicar tooltips em cada botão
+            ui.btn_src.setToolTip(self.get_text("tip_source"))
+            ui.btn_tgt.setToolTip(self.get_text("tip_target"))
+            ui.btn_invert.setToolTip(self.get_text("tip_invert"))
+            ui.btn_start.setToolTip(self.get_text("tip_start"))
+            ui.btn_pause.setToolTip(self.get_text("tip_pause"))
+            ui.btn_cancel.setToolTip(self.get_text("tip_cancel"))
+            
             if ui.state == ProcessState.PAUSED:
                 ui.btn_pause.setText(self.get_text("btn_resume_proc", "▶ Retomar"))
             else:
                 ui.btn_pause.setText(self.get_text("btn_pause_proc", "⏸ Pausar"))
+
+            # Atualiza dinamicamente o texto da caixa de lista caso o "Nenhum ficheiro" esteja visível
+            if ui.list_view.count() == 1:
+                item = ui.list_view.item(0)
+                if not (item.flags() & Qt.ItemFlag.ItemIsUserCheckable):
+                    item.setText(self.get_text("msg_no_files", "Nenhum ficheiro compatível..."))
 
         self.lbl_set_title.setText(self.get_text("tab_settings", "Configurações"))
         self.lbl_set_lang.setText((self.get_text("lbl_language", "Idioma")) + ":")
