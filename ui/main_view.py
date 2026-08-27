@@ -29,6 +29,7 @@ class CoreWorkerThread(QThread):
     progress_signal = Signal(object, int, int, float)
     status_signal = Signal(object, str, str)
     finished_signal = Signal(object, object)
+    error_dialog_signal = Signal(str, str)
 
     def __init__(self, request: ProcessRequest, workers: int, parent=None):
         super().__init__(parent)
@@ -46,19 +47,31 @@ class CoreWorkerThread(QThread):
         
         try:
             if hasattr(self.manager, 'verify_environment'):
-                verify_res = self.manager.verify_environment()
-                if isinstance(verify_res, tuple):
-                    success, reason = verify_res
-                else:
-                    success = bool(verify_res)
-                    reason = "O ambiente não atende aos requisitos mínimos."
+                success, missing_files = self.manager.verify_environment()
             else:
-                success, reason = True, ""
+                success, missing_files = True, []
 
             if not success:
-                self.log_signal.emit(f"[ERRO CRÍTICO] {reason}", "ERROR")
+                missing_str = ", ".join(missing_files)
+                sys_os = platform.system()
+                
+                if sys_os == "Windows":
+                    err_title = self.parent().get_text("err_title_win", "Error")
+                    err_msg = self.parent().get_text("err_msg_win", "Missing: {0}").format(missing_str)
+                elif sys_os == "Darwin":
+                    err_title = self.parent().get_text("err_title_mac", "Error")
+                    err_msg = self.parent().get_text("err_msg_mac", "Missing: {0}").format(missing_str)
+                else:
+                    err_title = self.parent().get_text("err_title_lin", "Error")
+                    err_msg = self.parent().get_text("err_msg_lin", "Missing: {0}").format(missing_str)
+                
+                self.log_signal.emit(f"[CRITICAL ERROR] Missing Engines: {missing_str}", "ERROR")
+                self.error_dialog_signal.emit(err_title, err_msg)
                 self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
                 return
+            else:
+                t_ok = self.parent().get_text("log_env_ok", "[SYSTEM] Verification complete. All embedded engines are operational.")
+                self.log_signal.emit(t_ok, "INFO")
             
             if self.req.collision_policy == CollisionPolicy.OVERWRITE:
                 self.log_signal.emit("[SISTEMA] Política de sobrescrita ativada. A limpar conflitos no destino...", "WARNING")
@@ -158,6 +171,13 @@ class MainController(QWidget):
         msg.setIcon(QMessageBox.Icon.Information)
         msg.exec()
         self.cfg.set("tutorial_done", True)
+
+    def _show_troubleshooting(self):
+        msg = QMessageBox(self)
+        msg.setWindowTitle(self.get_text("diag_troubleshoot_title", "Troubleshooting"))
+        msg.setText(self.get_text("diag_troubleshoot_msg", "Help..."))
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.exec()
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
@@ -367,27 +387,33 @@ class MainController(QWidget):
         self.lbl_ab_info = QLabel()
         layout.addWidget(self.lbl_ab_info)
         
+        # Grid para os botões de ação
+        btn_layout = QVBoxLayout()
+        btn_layout.setSpacing(8)
+        
         self.btn_ab_git = QPushButton()
         self.btn_ab_git.setStyleSheet("padding: 10px; text-align: left;")
         self.btn_ab_git.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL)))
-        layout.addWidget(self.btn_ab_git)
+        btn_layout.addWidget(self.btn_ab_git)
 
         self.btn_ab_kofi = QPushButton()
         self.btn_ab_kofi.setStyleSheet("""
-            QPushButton {
-                background-color: #29abe0;
-                color: white;
-                font-weight: bold;
-                padding: 10px;
-                text-align: left;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #1a8fbe;
-            }
+            QPushButton { background-color: #29abe0; color: white; font-weight: bold; padding: 10px; text-align: left; border-radius: 4px; }
+            QPushButton:hover { background-color: #1a8fbe; }
         """)
         self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdx047")))
-        layout.addWidget(self.btn_ab_kofi)
+        btn_layout.addWidget(self.btn_ab_kofi)
+        
+        # NOVO BOTÃO: RESOLUÇÃO DE PROBLEMAS
+        self.btn_ab_trouble = QPushButton()
+        self.btn_ab_trouble.setStyleSheet("""
+            QPushButton { background-color: #e67e22; color: white; font-weight: bold; padding: 10px; text-align: left; border-radius: 4px; }
+            QPushButton:hover { background-color: #d35400; }
+        """)
+        self.btn_ab_trouble.clicked.connect(self._show_troubleshooting)
+        btn_layout.addWidget(self.btn_ab_trouble)
+        
+        layout.addLayout(btn_layout)
         
         self.grp_ab_tut = QGroupBox()
         tut_layout = QVBoxLayout(self.grp_ab_tut)
@@ -497,6 +523,7 @@ class MainController(QWidget):
         self.lbl_ab_info.setText(f"<b>ZarManager {self.app_version}</b><br><br>💻 {t_dev}: dfdevx2<br>📜 Licença: MIT License")
         self.btn_ab_git.setText(self.get_text("btn_repo", "🌐 Repositório Oficial no GitHub"))
         self.btn_ab_kofi.setText(self.get_text("btn_kofi", "☕ Apoiar o Projeto no Ko-fi"))
+        self.btn_ab_trouble.setText(self.get_text("btn_troubleshoot", "🛠️ Resolução de Erros Comuns"))
         self.grp_ab_tut.setTitle(self.get_text("lbl_how_to_use", "Como Usar"))
         self.lbl_ab_tut.setText(self.get_text("about_tutorial", "Selecione o diretório, marque os itens e inicie."))
         self.chk_auto_upd.setText(self.get_text("lbl_auto_update", "Procurar Atualizações Automáticas"))
@@ -615,6 +642,10 @@ class MainController(QWidget):
         req.keep_originals = (resp == t_keep)
         self._dispatch_worker(req)
 
+    @Slot(str, str)
+    def _show_thread_error(self, title: str, msg: str):
+        DialogManager.show_error(self, title, msg)
+
     def _dispatch_worker(self, req: ProcessRequest):
         self._update_ui_state(req.mode, ProcessState.RUNNING)
         self.emit_log(f"[SISTEMA] Iniciando Trabalhador (Modo: {req.mode.value} | {len(req.items)} itens).", "INFO")
@@ -632,6 +663,7 @@ class MainController(QWidget):
         worker.progress_signal.connect(self._on_progress_update)
         worker.status_signal.connect(self._on_status_update)
         worker.finished_signal.connect(self._on_worker_finished)
+        worker.error_dialog_signal.connect(self._show_thread_error)
         
         self.active_threads[req.mode] = worker
         worker.start()

@@ -37,6 +37,17 @@ jobs:
           pip install -r requirements.txt
           pip install nuitka
 
+      - name: Nuitka Optimization Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/Nuitka
+            ~/AppData/Local/Nuitka/Nuitka/Cache
+            ~/Library/Caches/Nuitka
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-
+
       - name: Install Linux System Dependencies & FUSE for AppImage
         if: runner.os == 'Linux'
         run: |
@@ -110,7 +121,7 @@ jobs:
           
           codesign --force --deep -s - dist/app.app
           
-          brew install create-dmg
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
           create-dmg \
             --volname "ZarManager" \
             --window-pos 200 120 \
@@ -118,7 +129,7 @@ jobs:
             --icon-size 100 \
             --app-drop-link 425 120 \
             "dist/ZarManager-v1.1.0-macOS.dmg" \
-            "dist/app.app/"
+            "dist/app.app/" || true
             
           mkdir release_assets
           cp dist/ZarManager-v1.1.0-macOS.dmg release_assets/
@@ -153,16 +164,15 @@ jobs:
           body: |
             ## 🚀 ZarManager v1.1.0 - macOS Support & Enhancements
             
-            This update introduces native Apple ecosystem support, UI design refinements, and community support links.
+            This update introduces native Apple ecosystem support, proactive environment troubleshooting, and UI refinements.
             
             ### ✨ Key Features & Improvements
             * **macOS Support (.dmg):** First official release for Apple Silicon and Intel Macs via `.dmg` image bundle, featuring native macOS UI styling, custom app icons, and ad-hoc digital signature to bypass basic Gatekeeper constraints.
+            * **Smart Environment Verification:** The engine now automatically scans the system for required background binaries before processing. If any are missing due to Antivirus blocks (Windows) or permission issues (Linux/Mac), an OS-specific pop-up tutorial guides the user to a quick solution.
             * **Ko-fi Integration:** Added a direct support button in the "About" tab for users who wish to donate and support the project's continuous development.
-            * **First Boot Interactive Guide:** Implemented a welcome tutorial overlay that greets new users, explaining tabs and options to streamline onboarding.
+            * **First Boot Interactive Guide:** Implemented a welcome tutorial overlay that greets new users, explaining tabs, warnings, and options to streamline onboarding.
             * **Dynamic Tooltips:** Added sleek, natively styled global tooltips across the UI. Hovering over any element explains its function precisely in real-time.
             * **Smart Threading Logic:** The engine now automatically scales down the maximum worker count to match the number of active files, eliminating ghost threads and unnecessary I/O overhead.
-            * **Theme Engine Stability:** Fixed a critical bug in the Linux PySide6 rendering pipeline where changing visual themes would cause color overlaps and unreadable text. The theme foundation now safely resets the `QPalette` natively per execution.
-            * **Translation & Localization:** The theme dropdown list and list views now correctly retranslate their core texts dynamically without needing an application restart.
             
             ### 📦 Official Binaries
             * `ZarManager-v1.1.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
