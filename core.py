@@ -10,12 +10,13 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 class ZarManagerCore:
-    def __init__(self, selected_items, target_directory, max_workers, mode, keep_originals, log_callback, progress_callback, status_callback):
+    def __init__(self, selected_items, target_directory, max_workers, mode, keep_originals, policy_str, log_callback, progress_callback, status_callback):
         self.items = [Path(p) for p in selected_items]
         self.target_dir = Path(target_directory)
         self.max_workers = max_workers
         self.mode = mode
         self.keep_originals = keep_originals
+        self.policy = policy_str
         self.log = log_callback
         self.progress_cb = progress_callback
         self.status_cb = status_callback
@@ -38,22 +39,20 @@ class ZarManagerCore:
         self.bin_dir = self.base_dir / "bin"
         sys_os = platform.system()
         
-        # Ramificação específica e precisa para cada Sistema Operativo
         if sys_os == "Windows":
             self.xiso_bin = self.bin_dir / "extract-xiso.exe"
             self.zar_bin = self.bin_dir / "zarchive.exe"
             self.bin_7z = self.bin_dir / "7z.exe" 
-        elif sys_os == "Darwin":  # macOS
+        elif sys_os == "Darwin":
             self.xiso_bin = self.bin_dir / "extract-xiso-mac"
             self.zar_bin = self.bin_dir / "zarchive-mac"
-            # O macOS geralmente usa o binário '7zz' (Universal/ARM64)
             self.bin_7z = self.bin_dir / "7zz"
             
             if not self.bin_7z.exists() and shutil.which("7zz"):
                 self.bin_7z = Path(shutil.which("7zz"))
             elif not self.bin_7z.exists() and shutil.which("7z"):
                 self.bin_7z = Path(shutil.which("7z"))
-        else:  # Linux e outros
+        else:
             self.xiso_bin = self.bin_dir / "extract-xiso"
             self.zar_bin = self.bin_dir / "zarchive"
             self.bin_7z = self.bin_dir / "7z" 
@@ -116,6 +115,37 @@ class ZarManagerCore:
             total_ratio = sum(self.file_progress.values()) / self.total_tasks
         self.progress_cb(self.completed_tasks, self.total_tasks, total_ratio)
 
+    def _handle_collision(self, target_path):
+        if not target_path.exists():
+            return target_path
+            
+        if self.policy == "SKIP":
+            self.log(f"[SISTEMA] Pulando ficheiro existente: {target_path.name}")
+            return None
+            
+        elif self.policy == "OVERWRITE":
+            self.log(f"[SISTEMA] Sobrescrevendo ficheiro existente: {target_path.name}")
+            if target_path.is_file():
+                try: target_path.unlink()
+                except: pass
+            else:
+                shutil.rmtree(target_path, ignore_errors=True)
+            return target_path
+            
+        else: 
+            counter = 1
+            stem = target_path.stem
+            suffix = target_path.suffix
+            parent = target_path.parent
+            
+            new_target = target_path
+            while new_target.exists():
+                new_target = parent / f"{stem}_{counter}{suffix}"
+                counter += 1
+                
+            self.log(f"[SISTEMA] Renomeado para evitar conflito: {new_target.name}")
+            return new_target
+
     def _pipeline(self, item_path: Path):
         if self.cancel_flag.is_set():
             self.status_cb(item_path.name, "CANCELADO")
@@ -140,7 +170,6 @@ class ZarManagerCore:
             return 0.0, 1.0
 
         try:
-            # Permissão de execução no Mac/Linux para garantir que o binário pode rodar
             if platform.system() != "Windows":
                 if self.bin_7z.exists(): os.chmod(str(self.bin_7z), 0o755)
                 if self.xiso_bin.exists(): os.chmod(str(self.xiso_bin), 0o755)
@@ -148,6 +177,10 @@ class ZarManagerCore:
 
             if current_path.is_file() and current_path.suffix.lower() in ['.zip', '.rar', '.7z', '.tar', '.gz']:
                 temp_extract_dir = self.target_dir / f"temp_{current_path.stem}"
+                
+                if temp_extract_dir.exists():
+                    shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                    
                 cmd = [str(self.bin_7z), "e", str(current_path), f"-o{temp_extract_dir}", "-y"]
                 
                 b, w = get_step_info('7z')
@@ -159,15 +192,23 @@ class ZarManagerCore:
                     original_stem = Path(original_name).stem
                     target_file = self.target_dir / f"{original_stem}.iso"
                     
-                    counter = 1
-                    while target_file.exists():
-                        target_file = self.target_dir / f"{original_stem} ({counter}).iso"
-                        counter += 1
+                    target_file = self._handle_collision(target_file)
+                    if not target_file:
+                        shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                        self._finalize_item(original_name, "PULADO")
+                        return
                         
                     shutil.move(str(iso_files[0]), str(target_file))
                     current_path = target_file
                 else:
                     extracted_folder = self.target_dir / current_path.stem
+                    extracted_folder = self._handle_collision(extracted_folder)
+                    
+                    if not extracted_folder:
+                        shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                        self._finalize_item(original_name, "PULADO")
+                        return
+                        
                     shutil.move(str(temp_extract_dir), str(extracted_folder))
                     current_path = extracted_folder
                 
@@ -183,9 +224,16 @@ class ZarManagerCore:
 
             if self.mode in ['auto', 'extract'] and current_path.is_file() and current_path.suffix.lower() == '.iso':
                 iso_extract_dir = self.target_dir / current_path.stem
+                
+                iso_extract_dir = self._handle_collision(iso_extract_dir)
+                if not iso_extract_dir:
+                    self._finalize_item(original_name, "PULADO")
+                    return
+                
                 iso_extract_dir.mkdir(parents=True, exist_ok=True)
                 
-                cmd = [str(self.xiso_bin), "-x", str(current_path), "-d", str(iso_extract_dir)]
+                cmd = [str(self.xiso_bin), "-d", str(iso_extract_dir), "-x", str(current_path)]
+                
                 b, w = get_step_info('xiso')
                 self._run_cmd(cmd, cwd=str(self.target_dir), original_name=original_name, step_name="EXTRAINDO ISO", base_prog=b, weight_prog=w)
                 self.update_file_progress(original_name, b + w)
@@ -202,6 +250,12 @@ class ZarManagerCore:
 
             if self.mode in ['auto', 'compress'] and current_path.is_dir():
                 zar_output = self.target_dir / f"{current_path.name}.zar"
+                
+                zar_output = self._handle_collision(zar_output)
+                if not zar_output:
+                    self._finalize_item(original_name, "PULADO")
+                    return
+                    
                 cmd = [str(self.zar_bin), str(current_path), str(zar_output)]
                 
                 b, w = get_step_info('zar')
@@ -214,12 +268,19 @@ class ZarManagerCore:
             self._finalize_item(original_name, "CONCLUIDO")
 
         except Exception as e:
+            if "AV_BLOCK|" in str(e):
+                raise e 
             self.log(f"[ERRO NO ARQUIVO] {original_name}: {str(e)}")
             self._finalize_item(original_name, "FALHA")
 
     def _run_cmd(self, cmd_list, cwd=None, original_name=None, step_name="PROCESSANDO", base_prog=0.0, weight_prog=1.0):
         if self.cancel_flag.is_set():
             raise Exception("Cancelado pelo utilizador.")
+            
+        # --- VERIFICAÇÃO PROFUNDA (ANTI-GHOSTING / ANTIVÍRUS) ---
+        binary_path = Path(cmd_list[0])
+        if not binary_path.exists():
+            raise Exception(f"AV_BLOCK|{binary_path.name}")
             
         creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
         

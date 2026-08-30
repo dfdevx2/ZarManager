@@ -17,7 +17,6 @@ from models.process import ProcessMode, ProcessState, CollisionPolicy, ProcessRe
 from models.tab import TabState
 from services.logging_service import logger
 from services.file_service import FileService
-from services.update_service import UpdateService
 from services.sound_service import SoundService
 from ui.dialogs import DialogManager
 from core import ZarManagerCore
@@ -30,16 +29,19 @@ class CoreWorkerThread(QThread):
     status_signal = Signal(object, str, str)
     finished_signal = Signal(object, object)
     error_dialog_signal = Signal(str, str)
+    av_alert_signal = Signal(str)
 
-    def __init__(self, request: ProcessRequest, workers: int, parent=None):
+    def __init__(self, request: ProcessRequest, workers: int, policy_str: str, parent=None):
         super().__init__(parent)
         self.req = request
         self.workers = workers
+        self.policy_str = policy_str
         self.manager = None
 
     def run(self):
         self.manager = ZarManagerCore(
-            self.req.items, str(self.req.target), self.workers, self.req.mode.value, self.req.keep_originals, 
+            self.req.items, str(self.req.target), self.workers, self.req.mode.value, 
+            self.req.keep_originals, self.policy_str, 
             lambda m: self.log_signal.emit(m, "INFO"),
             lambda c, t, r: self.progress_signal.emit(self.req.mode, c, t, r),
             lambda i, s: self.status_signal.emit(self.req.mode, i, s)
@@ -47,12 +49,17 @@ class CoreWorkerThread(QThread):
         
         try:
             if hasattr(self.manager, 'verify_environment'):
-                success, missing_files = self.manager.verify_environment()
+                env_res = self.manager.verify_environment()
+                if isinstance(env_res, tuple):
+                    success, missing_files = env_res
+                else:
+                    success = env_res
+                    missing_files = []
             else:
                 success, missing_files = True, []
 
             if not success:
-                missing_str = ", ".join(missing_files)
+                missing_str = ", ".join(missing_files) if missing_files else "Ficheiros desconhecidos"
                 sys_os = platform.system()
                 
                 if sys_os == "Windows":
@@ -73,21 +80,6 @@ class CoreWorkerThread(QThread):
                 t_ok = self.parent().get_text("log_env_ok", "[SYSTEM] Verification complete. All embedded engines are operational.")
                 self.log_signal.emit(t_ok, "INFO")
             
-            if self.req.collision_policy == CollisionPolicy.OVERWRITE:
-                self.log_signal.emit("[SISTEMA] Política de sobrescrita ativada. A limpar conflitos no destino...", "WARNING")
-                for item in self.req.items:
-                    name = item.stem + ".zar" if self.req.mode in [ProcessMode.AUTO, ProcessMode.COMPRESS] else item.name
-                    target_file = self.req.target / name
-                    if target_file.exists():
-                        try:
-                            if target_file.is_file():
-                                target_file.unlink()
-                            elif target_file.is_dir():
-                                shutil.rmtree(target_file)
-                            self.log_signal.emit(f"[SISTEMA] Removido ficheiro anterior: {name}", "INFO")
-                        except Exception as e:
-                            self.log_signal.emit(f"[ERRO] Falha ao sobrescrever {name}: {e}", "ERROR")
-            
             self.manager.start_processing()
             
             stats = self.manager.get_completion_stats() if hasattr(self.manager, 'get_completion_stats') else {"failed": 0, "completed": len(self.req.items), "cancelled": 0, "total": len(self.req.items)}
@@ -103,8 +95,16 @@ class CoreWorkerThread(QThread):
                 self.finished_signal.emit(self.req.mode, ProcessState.COMPLETED)
                 
         except Exception as e:
+            error_str = str(e)
             logger.error("Exception in worker", exc_info=True)
-            self.log_signal.emit(f"[FATAL] Erro do motor: {e}. Verifique logs.", "ERROR")
+            
+            if "AV_BLOCK|" in error_str:
+                binary_name = error_str.split("|")[1]
+                self.av_alert_signal.emit(binary_name)
+                self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
+                return
+
+            self.log_signal.emit(f"[FATAL] Erro do motor: {error_str}. Verifique logs.", "ERROR")
             self.finished_signal.emit(self.req.mode, ProcessState.FAILED)
 
 
@@ -153,6 +153,9 @@ class MainController(QWidget):
         
         if not self.cfg.get("tutorial_done"):
             QTimer.singleShot(800, self._show_tutorial)
+            
+        if self.cfg.get("auto_update") is not False:
+            QTimer.singleShot(2500, lambda: self._check_for_updates(silent=True))
 
     def get_text(self, key: str, fallback: str = "") -> str:
         try:
@@ -387,7 +390,6 @@ class MainController(QWidget):
         self.lbl_ab_info = QLabel()
         layout.addWidget(self.lbl_ab_info)
         
-        # Grid para os botões de ação
         btn_layout = QVBoxLayout()
         btn_layout.setSpacing(8)
         
@@ -404,7 +406,6 @@ class MainController(QWidget):
         self.btn_ab_kofi.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/dfdx047")))
         btn_layout.addWidget(self.btn_ab_kofi)
         
-        # NOVO BOTÃO: RESOLUÇÃO DE PROBLEMAS
         self.btn_ab_trouble = QPushButton()
         self.btn_ab_trouble.setStyleSheet("""
             QPushButton { background-color: #e67e22; color: white; font-weight: bold; padding: 10px; text-align: left; border-radius: 4px; }
@@ -428,7 +429,7 @@ class MainController(QWidget):
         self.chk_auto_upd.stateChanged.connect(lambda state: self.cfg.set("auto_update", state == Qt.CheckState.Checked.value))
         
         self.btn_ab_upd = QPushButton()
-        self.btn_ab_upd.clicked.connect(self._check_for_updates)
+        self.btn_ab_upd.clicked.connect(lambda: self._check_for_updates(silent=False))
         
         self.lbl_upd_status = QLabel("")
         
@@ -603,34 +604,38 @@ class MainController(QWidget):
             return
 
         target_path = Path(target_dir)
-        collisions = [p for p in selected if (target_path / (p.stem + ".zar" if mode in [ProcessMode.AUTO, ProcessMode.COMPRESS] else p.name)).exists()]
+        collisions = []
+        for p in selected:
+            possible_names = [p.name, p.stem + ".zar", p.stem + ".iso", p.stem]
+            if any((target_path / pos).exists() for pos in possible_names):
+                collisions.append(p)
 
         req = ProcessRequest(mode=mode, items=selected, target=target_path, keep_originals=False, collision_policy=CollisionPolicy.CANCEL)
+        policy_str = "RENAME" 
 
         if collisions:
             btn_canc = self.get_text("btn_cancel", "Cancelar")
             btn_skip = self.get_text("btn_skip_existing", "Pular Existentes")
             btn_over = self.get_text("btn_overwrite", "Sobrescrever")
+            btn_ren = self.get_text("btn_rename", "Renomear Auto (_1)")
             
             resp = DialogManager.ask_custom(self, 
                                             self.get_text("msg_collision_title", "Conflito de Ficheiros"), 
-                                            self.get_text("msg_collision_desc", "Alguns ficheiros já existem no destino. O que deseja fazer?"), 
-                                            [btn_canc, btn_skip, btn_over])
+                                            self.get_text("msg_collision_desc", "Alguns ficheiros ou pastas intermédias já existem no destino. O que deseja fazer?"), 
+                                            [btn_canc, btn_skip, btn_over, btn_ren])
             if resp == btn_canc or resp == "":
                 self.emit_log(self.get_text("log_warn_cancelled", "[AVISO] Operação cancelada devido a conflitos."), "WARNING")
                 return
             elif resp == btn_skip:
-                req.items = [p for p in req.items if p not in collisions]
-                if not req.items:
-                    self.emit_log(self.get_text("log_warn_empty", "[AVISO] Fila vazia após pular conflitos."), "WARNING")
-                    return
-                req.collision_policy = CollisionPolicy.SKIP
-            else:
-                req.collision_policy = CollisionPolicy.OVERWRITE
+                policy_str = "SKIP"
+            elif resp == btn_over:
+                policy_str = "OVERWRITE"
+            elif resp == btn_ren:
+                policy_str = "RENAME"
         
-        self._prompt_deletion(req)
+        self._prompt_deletion(req, policy_str)
 
-    def _prompt_deletion(self, req: ProcessRequest):
+    def _prompt_deletion(self, req: ProcessRequest, policy_str: str):
         t_del = self.get_text("btn_delete_default", "Apagar Originais (Padrão)")
         t_keep = self.get_text("btn_keep_originals", "Manter Originais")
         
@@ -640,13 +645,26 @@ class MainController(QWidget):
                                         [t_del, t_keep])
         if resp == "": return 
         req.keep_originals = (resp == t_keep)
-        self._dispatch_worker(req)
+        self._dispatch_worker(req, policy_str)
 
     @Slot(str, str)
     def _show_thread_error(self, title: str, msg: str):
         DialogManager.show_error(self, title, msg)
 
-    def _dispatch_worker(self, req: ProcessRequest):
+    @Slot(str)
+    def _show_antivirus_alert(self, binary_name):
+        for mode in ProcessMode:
+            if mode in self.active_threads:
+                self._request_cancel(mode)
+                
+        SoundService.play("error")
+        t_title = self.get_text("av_alert_title", "Alerta Crítico de Segurança")
+        msg = self.get_text("av_alert_msg", "Erro de antivírus bloqueando {0}.").format(binary_name)
+        
+        QMessageBox.critical(self, t_title, msg)
+        self.emit_log(self.get_text("log_av_block", "[BLOQUEIO] Motor destruído: {0}").format(binary_name), "ERROR")
+
+    def _dispatch_worker(self, req: ProcessRequest, policy_str: str):
         self._update_ui_state(req.mode, ProcessState.RUNNING)
         self.emit_log(f"[SISTEMA] Iniciando Trabalhador (Modo: {req.mode.value} | {len(req.items)} itens).", "INFO")
         
@@ -657,13 +675,14 @@ class MainController(QWidget):
         ui.lbl_counter.setText(f"0 / {len(req.items)} {txt_proc}")
 
         workers = int(self.cfg.get("workers") or 2)
-        worker = CoreWorkerThread(req, workers, self)
+        worker = CoreWorkerThread(req, workers, policy_str, self)
         
         worker.log_signal.connect(self.emit_log)
         worker.progress_signal.connect(self._on_progress_update)
         worker.status_signal.connect(self._on_status_update)
         worker.finished_signal.connect(self._on_worker_finished)
         worker.error_dialog_signal.connect(self._show_thread_error)
+        worker.av_alert_signal.connect(self._show_antivirus_alert) 
         
         self.active_threads[req.mode] = worker
         worker.start()
@@ -685,38 +704,42 @@ class MainController(QWidget):
             worker.manager.request_cancel()
             self.emit_log("[SISTEMA] Interrupção enviada. A aguardar que as threads parem com segurança...", "WARNING")
 
-    def _check_for_updates(self):
-        self.btn_ab_upd.setEnabled(False)
-        self.lbl_upd_status.setText(self.get_text("lbl_checking_updates", "A verificar atualizações..."))
-        
-        def perform_check():
-            try:
-                has_update = False
-                if hasattr(UpdateService, 'check_latest'):
-                    has_update = UpdateService.check_latest(self.app_version)
-                
-                if has_update:
-                    self.lbl_upd_status.setText(self.get_text("msg_update_avail", "Nova atualização disponível!"))
-                else:
-                    self.lbl_upd_status.setText(self.get_text("msg_update_none", "Está na versão mais recente."))
-            except Exception:
-                self.lbl_upd_status.setText(self.get_text("msg_update_fail", "Falha na verificação."))
-            finally:
-                self.btn_ab_upd.setEnabled(True)
-                QTimer.singleShot(5000, lambda: self.lbl_upd_status.setText(""))
+    def _check_for_updates(self, silent=False):
+        try:
+            from ui.update_dialog import UpdateDialog, GitHubFetchThread
+        except ImportError:
+            self.emit_log("[ERRO] Arquivo 'ui/update_dialog.py' não encontrado. Por favor, coloque-o na pasta 'ui'.", "ERROR")
+            return
 
-        QTimer.singleShot(800, perform_check)
+        if not silent:
+            # Clique manual: Abre a janela sempre
+            dialog = UpdateDialog(self.app_version, self.cfg.get("language") or "pt-br", self)
+            dialog.exec()
+        else:
+            # Arranque silencioso: Verifica no fundo sem congelar a UI
+            self.silent_thread = GitHubFetchThread()
+            
+            def on_silent_done(data):
+                latest_version = data.get("tag_name", "").lower().replace("v", "")
+                current = self.app_version.lower().replace("v", "")
+                # Se for maior, invoca o popup e passa a versão já descarregada
+                if latest_version > current:
+                    dialog = UpdateDialog(self.app_version, self.cfg.get("language") or "pt-br", self, pre_fetched_data=data)
+                    dialog.exec()
+                    
+            self.silent_thread.result_signal.connect(on_silent_done)
+            self.silent_thread.start()
 
     @Slot(str, str)
     def emit_log(self, msg: str, level: str = "INFO"):
         lang = self.cfg.get("language") or "pt-br"
         if lang == "en":
             msg = msg.replace("[ERRO CRÍTICO]", "[CRITICAL ERROR]")
+            msg = msg.replace("[SISTEMA] Pulando ficheiro existente:", "[SYSTEM] Skipping existing file:")
+            msg = msg.replace("[SISTEMA] Sobrescrevendo ficheiro existente:", "[SYSTEM] Overwriting existing file:")
+            msg = msg.replace("[SISTEMA] Renomeado para evitar conflito:", "[SYSTEM] Renamed to avoid conflict:")
+            msg = msg.replace("Alguns ficheiros ou pastas intermédias já existem no destino", "Some files or intermediate folders already exist in the target")
             msg = msg.replace("O ambiente não atende aos requisitos mínimos.", "Environment does not meet minimum requirements.")
-            msg = msg.replace("[SISTEMA] Política de sobrescrita ativada", "[SYSTEM] Overwrite policy active")
-            msg = msg.replace("A limpar conflitos no destino...", "Cleaning conflicts in target...")
-            msg = msg.replace("[SISTEMA] Removido ficheiro anterior:", "[SYSTEM] Removed previous file:")
-            msg = msg.replace("[ERRO] Falha ao sobrescrever", "[ERROR] Failed to overwrite")
             msg = msg.replace("[SISTEMA] Iniciando Trabalhador", "[SYSTEM] Starting Worker")
             msg = msg.replace("Modo:", "Mode:")
             msg = msg.replace("itens", "items")
@@ -760,6 +783,7 @@ class MainController(QWidget):
         t_extracting_arc = self.get_text("log_extracting_arc", "DESCOMPACTANDO")
         t_compressing = self.get_text("log_compressing", "COMPRIMINDO ZAR")
         t_completed = self.get_text("log_completed", "CONCLUÍDO")
+        t_skipped = self.get_text("log_skipped", "PULADO")
         t_failed = self.get_text("log_failed", "FALHA")
         t_cancelled = self.get_text("log_cancelled", "CANCELADO")
         
@@ -767,6 +791,7 @@ class MainController(QWidget):
         status = status.replace("DESCOMPACTANDO", t_extracting_arc)
         status = status.replace("COMPRIMINDO ZAR", t_compressing)
         status = status.replace("CONCLUIDO", t_completed)
+        status = status.replace("PULADO", t_skipped)
         status = status.replace("FALHA", t_failed)
         status = status.replace("CANCELADO", t_cancelled)
 

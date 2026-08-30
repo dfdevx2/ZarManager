@@ -49,7 +49,6 @@ class UpdaterService:
 
         for asset in assets:
             name = asset["name"].lower()
-            # Windows agora procura o ficheiro .zip
             if os_name == "Windows" and name.endswith(".zip"):
                 return asset["browser_download_url"], ".zip"
             elif os_name == "Linux" and name.endswith(".appimage"):
@@ -72,7 +71,6 @@ class UpdaterService:
         current_exe = sys.executable if is_compiled else sys.argv[0]
 
         if os_name == "Windows":
-            # Script Batch Avançado para extrair o ZIP e sobrescrever os ficheiros atuais
             current_dir = Path(current_exe).parent
             bat_path = Path(tempfile.gettempdir()) / "zarmanager_update.bat"
             extract_dir = Path(tempfile.gettempdir()) / "ZarManager_Extracted"

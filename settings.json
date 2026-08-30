@@ -1,0 +1,11 @@
+{
+    "source_dir": "",
+    "target_dir": "",
+    "workers": 4,
+    "language": "pt-br",
+    "theme": "Steam",
+    "auto_update": true,
+    "window_geometry": "",
+    "first_boot_done": true,
+    "tutorial_done": true
+}

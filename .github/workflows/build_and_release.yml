@@ -83,27 +83,30 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          ./appimagetool AppDir dist/ZarManager-v1.1.0-x86_64.AppImage
+          ./appimagetool AppDir dist/ZarManager-v1.2.0-x86_64.AppImage
           
           mkdir -p release_assets
           cp dist/ZarManager-Linux release_assets/
-          cp dist/ZarManager-v1.1.0-x86_64.AppImage release_assets/
+          cp dist/ZarManager-v1.2.0-x86_64.AppImage release_assets/
 
       - name: Build with Nuitka (Windows via MinGW64)
         if: runner.os == 'Windows'
-        run: |
-          python -m nuitka --onefile --enable-plugin=pyside6 --include-data-dir=bin=bin --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.1.0.0" --windows-product-version="1.1.0.0" --windows-company-name="dfdevx2" --output-filename=ZarManager-Windows.exe --output-dir=dist app.py
-          
-          mkdir release_assets
-          cp dist/ZarManager-Windows.exe release_assets/
-
-      - name: Sign Windows Executable (Self-Signed Certificate)
-        if: runner.os == 'Windows'
         shell: powershell
         run: |
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=dfdevx2, O=ZarManager" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(5)
-          Set-AuthenticodeSignature -FilePath "release_assets\ZarManager-Windows.exe" -Certificate $cert
-          Write-Host "ZarManager-Windows.exe successfully signed!"
+          # Usar --standalone em vez de --onefile para evitar falsos positivos no Windows Defender
+          python -m nuitka --standalone --enable-plugin=pyside6 --include-data-dir=bin=bin --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
+          
+          # Renomear o executável principal dentro da pasta dist
+          Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
+          
+          # Renomear a pasta para ficar limpa para o utilizador
+          Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Windows"
+          
+          # Criar o diretório de destino
+          New-Item -ItemType Directory -Force -Path release_assets
+          
+          # Compactar a pasta num ZIP
+          Compress-Archive -Path "dist\ZarManager-Windows" -DestinationPath "release_assets\ZarManager-v1.2.0-Windows.zip"
 
       - name: Build with Nuitka (macOS DMG)
         if: runner.os == 'macOS'
@@ -128,11 +131,11 @@ jobs:
             --window-size 600 400 \
             --icon-size 100 \
             --app-drop-link 425 120 \
-            "dist/ZarManager-v1.1.0-macOS.dmg" \
+            "dist/ZarManager-v1.2.0-macOS.dmg" \
             "dist/app.app/" || true
             
           mkdir release_assets
-          cp dist/ZarManager-v1.1.0-macOS.dmg release_assets/
+          cp dist/ZarManager-v1.2.0-macOS.dmg release_assets/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -155,29 +158,29 @@ jobs:
         with:
           draft: true
           prerelease: false
-          name: ZarManager v1.1.0
-          tag_name: v1.1.0
+          name: ZarManager v1.2.0
+          tag_name: v1.2.0
           files: |
             linux-assets/*
             windows-assets/*
             macos-assets/*
           body: |
-            ## 🚀 ZarManager v1.1.0 - macOS Support & Enhancements
+            ## ZarManager v1.2.0 - Core Stability, Smart Updater & Collision Engine
             
-            This update introduces native Apple ecosystem support, proactive environment troubleshooting, and UI refinements.
+            This update overhauls background architecture to provide native in-place updates, complete macOS UNIX compliance, and deep mitigation against false-positive antivirus interventions.
             
-            ### ✨ Key Features & Improvements
-            * **macOS Support (.dmg):** First official release for Apple Silicon and Intel Macs via `.dmg` image bundle, featuring native macOS UI styling, custom app icons, and ad-hoc digital signature to bypass basic Gatekeeper constraints.
-            * **Smart Environment Verification:** The engine now automatically scans the system for required background binaries before processing. If any are missing due to Antivirus blocks (Windows) or permission issues (Linux/Mac), an OS-specific pop-up tutorial guides the user to a quick solution.
-            * **Ko-fi Integration:** Added a direct support button in the "About" tab for users who wish to donate and support the project's continuous development.
-            * **First Boot Interactive Guide:** Implemented a welcome tutorial overlay that greets new users, explaining tabs, warnings, and options to streamline onboarding.
-            * **Dynamic Tooltips:** Added sleek, natively styled global tooltips across the UI. Hovering over any element explains its function precisely in real-time.
-            * **Smart Threading Logic:** The engine now automatically scales down the maximum worker count to match the number of active files, eliminating ghost threads and unnecessary I/O overhead.
+            ### Key Features & Improvements
+            * **Smart In-Place Updater:** Integrated a native, asynchronous updater that downloads releases directly from GitHub, generates an OS-specific injection script, and safely restarts the application (Windows/Linux). macOS routes gracefully to the browser to ensure Gatekeeper compliance.
+            * **Advanced File Collision Handling:** Operating modes no longer blindly overwrite files or cause application crashes on duplicates. A unified prompt now allows users to Overwrite, Skip, or Auto-Rename conflicting files.
+            * **macOS UNIX Architecture Fixes:** Resolved fatal extraction and directory creation errors on macOS/Linux by re-engineering the extract-xiso command execution pipeline and argument structures.
+            * **Surgical Security Interception:** Mitigated sudden Windows Defender crashes. The core now executes a pre-flight deep scan milliseconds before processing. If an antivirus deletes a background engine, the tool safely aborts the active thread and displays a precise tutorial for whitelisting the application.
+            * **Bilingual Expansion:** Added and structured new localization keys for the collision dialogs, update sequences, and security alerts in both Portuguese and English.
+            * **Windows Anti-Virus Fix:** Distributed Windows builds are now packaged as a compressed folder (`.zip`) instead of a single executable (`.exe`). This prevents extraction mechanisms that historically triggered severe false-positive alerts on Windows Defender.
             
-            ### 📦 Official Binaries
-            * `ZarManager-v1.1.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
+            ### Official Binaries
+            * `ZarManager-v1.2.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
             * `ZarManager-Linux` (Standard Linux portable binary)
-            * `ZarManager-Windows.exe` (Standalone Windows executable with embedded icon, metadata and digital signature)
-            * `ZarManager-v1.1.0-macOS.dmg` (macOS Drag-and-Drop Application Bundle)
+            * `ZarManager-v1.2.0-Windows.zip` (Windows package containing the executable and native dependencies)
+            * `ZarManager-v1.2.0-macOS.dmg` (macOS Drag-and-Drop Application Bundle)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

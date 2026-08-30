@@ -71,11 +71,12 @@ TRANSLATIONS = {
         
         # === DIÁLOGOS DE CONFLITO E EXCLUSÃO ===
         "msg_collision_title": "Conflito de Arquivos",
-        "msg_collision_desc": "Alguns itens selecionados já existem no diretório de destino.\n\n• Sobrescrever: Substitui os ficheiros existentes.\n• Pular Existentes: Ignora e processa apenas os novos.\n• Cancelar: Abortar a operação.",
+        "msg_collision_desc": "Alguns itens selecionados ou pastas intermédias já existem no destino. O que deseja fazer?\n\n• Sobrescrever: Substitui os ficheiros existentes.\n• Pular Existentes: Ignora e processa apenas os novos.\n• Renomear Auto: Adiciona (_1) para evitar conflitos.\n• Cancelar: Aborta a operação.",
         "msg_queue_empty": "Todos os itens conflitantes foram pulados. A fila está vazia.",
         "btn_cancel": "Cancelar",
         "btn_skip_existing": "Pular Existentes",
         "btn_overwrite": "Sobrescrever",
+        "btn_rename": "Renomear Auto (_1)",
         
         "delete_title": "Manter Arquivos Originais?",
         "delete_msg": "Por padrão, a ferramenta deleta os arquivos de origem (ISOs, ZIPs, Pastas) após o sucesso da operação para economizar espaço no disco.\n\nDeseja MANTER os arquivos originais?\n\n• Manter Originais: Mantém a origem e o arquivo gerado.\n• Apagar (Padrão): Exclui a origem após gerar o arquivo.",
@@ -96,6 +97,11 @@ TRANSLATIONS = {
         "err_msg_mac": "O ZarManager não conseguiu aceder aos seguintes motores embutidos:\n\n{0}\n\nNo macOS, isto pode ocorrer se o pacote (.dmg) não foi montado corretamente ou se as permissões de extração foram bloqueadas.\n\nSOLUÇÃO:\n1. Certifique-se de ter arrastado o ZarManager para a pasta 'Aplicações' antes de abrir.\n2. Verifique se o sistema não bloqueou a execução nas 'Definições de Sistema > Privacidade e Segurança'.",
         "err_title_lin": "Erro Crítico: Permissões de Ficheiro",
         "err_msg_lin": "O ZarManager não conseguiu aceder aos seguintes motores embutidos:\n\n{0}\n\nNo Linux, isto geralmente é causado por falta de permissões na extração da AppImage ou falta do pacote FUSE.\n\nSOLUÇÃO:\n1. Clique com o botão direito no ficheiro .AppImage, vá a 'Propriedades' e ative 'Permitir execução do ficheiro como um programa'.\n2. Confirme que tem o pacote 'libfuse2' instalado no seu sistema.",
+        
+        # --- ALERTA CIRÚRGICO DE ANTIVÍRUS (NOVO) ---
+        "av_alert_title": "Alerta Crítico de Segurança",
+        "av_alert_msg": "O Windows Defender (ou o seu Antivírus) acabou de eliminar o ficheiro '{0}' da memória em tempo real.\n\nIsto é um 'Falso Positivo' comum. Para o ZarManager funcionar, por favor:\n1. Vá ao Histórico de Proteção do Windows Defender.\n2. Permita/Restaure a ameaça bloqueada.\n3. Adicione a pasta do ZarManager às Exclusões do seu Antivírus.",
+        "log_av_block": "[BLOQUEIO] O Antivírus destruiu o motor: {0}",
 
         # === STATUS DO PROCESSAMENTO ===
         "log_extracting_iso": "EXTRAINDO ISO",
@@ -104,6 +110,7 @@ TRANSLATIONS = {
         "log_completed": "CONCLUÍDO",
         "log_failed": "FALHA",
         "log_cancelled": "CANCELADO",
+        "log_skipped": "PULADO",
 
         # === DICAS / TOOLTIPS ===
         "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até ao formato .zar e limpa resíduos.",
@@ -191,11 +198,12 @@ TRANSLATIONS = {
         
         # === COLLISION AND DELETION DIALOGS ===
         "msg_collision_title": "File Collision",
-        "msg_collision_desc": "Some selected items already exist in the target directory.\n\n• Overwrite: Replaces existing files.\n• Skip Existing: Ignores duplicates and processes only new ones.\n• Cancel: Abort the operation.",
+        "msg_collision_desc": "Some selected items or intermediate folders already exist in the target directory. What do you want to do?\n\n• Overwrite: Replaces existing files.\n• Skip Existing: Ignores duplicates and processes only new ones.\n• Auto Rename: Appends (_1) to avoid conflicts.\n• Cancel: Abort the operation.",
         "msg_queue_empty": "All conflicting items were skipped. The queue is empty.",
         "btn_cancel": "Cancel",
         "btn_skip_existing": "Skip Existing",
         "btn_overwrite": "Overwrite",
+        "btn_rename": "Auto Rename (_1)",
         
         "delete_title": "Keep Original Files?",
         "delete_msg": "By default, the tool deletes source files (ISOs, ZIPs, Folders) after a successful operation to save disk space.\n\nDo you want to KEEP the original files?\n\n• Keep Originals: Keeps both the source and the generated file.\n• Delete (Default): Deletes the source after generation.",
@@ -216,6 +224,11 @@ TRANSLATIONS = {
         "err_msg_mac": "ZarManager could not access the following embedded engines:\n\n{0}\n\nOn macOS, this can happen if the App Bundle was not mounted properly or extraction permissions were blocked.\n\nSOLUTION:\n1. Make sure you drag ZarManager to your 'Applications' folder before opening it.\n2. Check if your system blocked the execution under 'System Settings > Privacy & Security'.",
         "err_title_lin": "Critical Error: File Permissions",
         "err_msg_lin": "ZarManager could not access the following embedded engines:\n\n{0}\n\nOn Linux, this is usually caused by missing permissions to extract the AppImage or a missing FUSE package.\n\nSOLUTION:\n1. Right-click the .AppImage file, go to 'Properties' and enable 'Allow executing file as program'.\n2. Ensure you have the 'libfuse2' package installed on your system.",
+        
+        # --- ALERTA CIRÚRGICO DE ANTIVÍRUS (NOVO) ---
+        "av_alert_title": "Critical Security Alert",
+        "av_alert_msg": "Windows Defender (or your Antivirus) just deleted the file '{0}' from memory in real time.\n\nThis is a common 'False Positive'. For ZarManager to work, please:\n1. Go to Windows Defender Protection History.\n2. Allow/Restore the blocked threat.\n3. Add the ZarManager folder to your Antivirus Exclusions.",
+        "log_av_block": "[BLOCKED] Antivirus destroyed the engine: {0}",
 
         # === STATUS DO PROCESSAMENTO ===
         "log_extracting_iso": "EXTRACTING ISO",
@@ -224,6 +237,7 @@ TRANSLATIONS = {
         "log_completed": "COMPLETED",
         "log_failed": "FAILED",
         "log_cancelled": "CANCELLED",
+        "log_skipped": "SKIPPED",
 
         # === TIPS / TOOLTIPS ===
         "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar format.",
