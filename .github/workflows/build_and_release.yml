@@ -93,20 +93,25 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          # Usar --standalone em vez de --onefile para evitar falsos positivos no Windows Defender
           python -m nuitka --standalone --enable-plugin=pyside6 --include-data-dir=bin=bin --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
           
-          # Renomear o executável principal dentro da pasta dist
           Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
-          
-          # Renomear a pasta para ficar limpa para o utilizador
           Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Windows"
           
-          # Criar o diretório de destino
-          New-Item -ItemType Directory -Force -Path release_assets
+          # TRUQUE DE UX: Esconde todos os ficheiros DLLs e Pastas Feias na raiz, deixando apenas o ZarManager.exe e a pasta "bin" visíveis!
+          Get-ChildItem -Path "dist\ZarManager-Windows" -File | Where-Object { $_.Name -ne 'ZarManager.exe' } | ForEach-Object { $_.Attributes = 'Hidden' }
+          Get-ChildItem -Path "dist\ZarManager-Windows" -Directory | Where-Object { $_.Name -ne 'bin' } | ForEach-Object { $_.Attributes = 'Hidden' }
           
-          # Compactar a pasta num ZIP
+          New-Item -ItemType Directory -Force -Path release_assets
           Compress-Archive -Path "dist\ZarManager-Windows" -DestinationPath "release_assets\ZarManager-v1.2.0-Windows.zip"
+
+      - name: Sign Windows Executable (Self-Signed Certificate)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=dfdevx2, O=ZarManager" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(5)
+          Set-AuthenticodeSignature -FilePath "dist\ZarManager-Windows\ZarManager.exe" -Certificate $cert
+          Write-Host "ZarManager.exe successfully signed!"
 
       - name: Build with Nuitka (macOS DMG)
         if: runner.os == 'macOS'
@@ -175,7 +180,7 @@ jobs:
             * **macOS UNIX Architecture Fixes:** Resolved fatal extraction and directory creation errors on macOS/Linux by re-engineering the extract-xiso command execution pipeline and argument structures.
             * **Surgical Security Interception:** Mitigated sudden Windows Defender crashes. The core now executes a pre-flight deep scan milliseconds before processing. If an antivirus deletes a background engine, the tool safely aborts the active thread and displays a precise tutorial for whitelisting the application.
             * **Bilingual Expansion:** Added and structured new localization keys for the collision dialogs, update sequences, and security alerts in both Portuguese and English.
-            * **Windows Anti-Virus Fix:** Distributed Windows builds are now packaged as a compressed folder (`.zip`) instead of a single executable (`.exe`). This prevents extraction mechanisms that historically triggered severe false-positive alerts on Windows Defender.
+            * **Windows Anti-Virus Fix:** Distributed Windows builds are now packaged as a compressed folder (`.zip`) instead of a single executable (`.exe`). This prevents extraction mechanisms that historically triggered severe false-positive alerts on Windows Defender. Internal dependencies have been visually hidden for a clean out-of-the-box user experience.
             
             ### Official Binaries
             * `ZarManager-v1.2.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)

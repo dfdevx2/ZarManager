@@ -2,6 +2,7 @@ import json
 import urllib.request
 from urllib.error import URLError
 import tempfile
+import ssl
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -22,7 +23,12 @@ class GitHubFetchThread(QThread):
         url = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
         req = urllib.request.Request(url, headers={'User-Agent': 'ZarManager-App'})
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            # Ignora a verificação rígida de certificados que causa o erro SSL no Python compilado
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                 data = json.loads(response.read().decode())
                 self.result_signal.emit(data)
         except URLError as e:
@@ -40,7 +46,6 @@ class UpdateDialog(QDialog):
         
         self._build_ui()
         
-        # Se recebeu os dados do verificador automático, não volta a procurar
         if pre_fetched_data:
             self._on_fetch_success(pre_fetched_data)
         else:

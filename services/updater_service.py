@@ -4,6 +4,7 @@ import platform
 import subprocess
 import urllib.request
 import tempfile
+import ssl
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
 
@@ -19,8 +20,12 @@ class DownloadThread(QThread):
 
     def run(self):
         try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
             req = urllib.request.Request(self.url, headers={'User-Agent': 'ZarManager-Updater'})
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
                 total_size = int(response.info().get('Content-Length', -1))
                 downloaded = 0
                 chunk_size = 16384 
@@ -43,7 +48,6 @@ class DownloadThread(QThread):
 class UpdaterService:
     @staticmethod
     def get_asset_url(release_data: dict) -> tuple[str, str]:
-        """ Deteta o SO e devolve o link de download e a extensão """
         os_name = platform.system()
         assets = release_data.get("assets", [])
 
@@ -60,7 +64,6 @@ class UpdaterService:
 
     @staticmethod
     def apply_update_and_restart(new_file_path: str):
-        """ Gera os scripts de suicídio/substituição baseados no SO """
         os_name = platform.system()
         is_compiled = getattr(sys, 'frozen', False)
         
@@ -79,7 +82,7 @@ class UpdaterService:
                 f.write(f"""@echo off
 timeout /t 2 /nobreak > NUL
 powershell -Command "Expand-Archive -Path '{new_file_path}' -DestinationPath '{extract_dir}' -Force"
-xcopy /Y /E /H /C /I "{extract_dir}\\ZarManager-Windows\\*" "{current_dir}\\"
+xcopy /Y /E /H /C /I /R "{extract_dir}\\ZarManager-Windows\\*" "{current_dir}\\"
 rmdir /S /Q "{extract_dir}"
 del "{new_file_path}"
 start "" "{current_exe}"
