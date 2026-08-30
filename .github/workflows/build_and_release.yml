@@ -58,6 +58,9 @@ jobs:
       - name: Build with Nuitka (Linux Onefile)
         if: runner.os == 'Linux'
         run: |
+          # Limpar motores de Mac e Windows antes de compilar
+          rm -f bin/*.exe bin/*-mac bin/7zz
+          
           python -m nuitka --onefile --enable-plugin=pyside6 --include-data-dir=bin=bin --lto=no --output-filename=ZarManager-Linux --output-dir=dist app.py
           
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/applications
@@ -93,13 +96,21 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
+          # 1. Limpar a pasta bin de ficheiros de Mac/Linux antes de compilar
+          Get-ChildItem -Path "bin" -File | Where-Object { $_.Extension -ne '.exe' } | Remove-Item -Force
+          
+          # 2. Compilar
           python -m nuitka --standalone --enable-plugin=pyside6 --include-data-dir=bin=bin --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
           
           Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
           Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Windows"
           
-          # TRUQUE DE UX: Esconde todos os ficheiros DLLs e Pastas Feias na raiz, deixando apenas o ZarManager.exe e a pasta "bin" visíveis!
-          Get-ChildItem -Path "dist\ZarManager-Windows" -File | Where-Object { $_.Name -ne 'ZarManager.exe' } | ForEach-Object { $_.Attributes = 'Hidden' }
+          # 3. Criar o ficheiro de AVISO IMPORTANTE para o utilizador
+          $readme = "AVISO IMPORTANTE!`n`n1. O ficheiro 'ZarManager.exe' NAO PODE ser movido para fora desta pasta.`n2. A pasta 'bin' NAO PODE ser apagada ou alterada.`n`nO programa precisa de todos os ficheiros (incluindo os ocultos) para funcionar e evitar bloqueios do Antivirus.`n`nSe quiser um atalho no Ambiente de Trabalho:`n- Clique com o botao direito no ZarManager.exe`n- Selecione 'Mostrar mais opcoes' -> 'Enviar para' -> 'Ambiente de trabalho (criar atalho)'."
+          Set-Content -Path "dist\ZarManager-Windows\LEIA-ME_IMPORTANTE.txt" -Value $readme -Encoding UTF8
+          
+          # 4. Esconder as pastas e DLLs feias
+          Get-ChildItem -Path "dist\ZarManager-Windows" -File | Where-Object { $_.Name -notin @('ZarManager.exe', 'LEIA-ME_IMPORTANTE.txt') } | ForEach-Object { $_.Attributes = 'Hidden' }
           Get-ChildItem -Path "dist\ZarManager-Windows" -Directory | Where-Object { $_.Name -ne 'bin' } | ForEach-Object { $_.Attributes = 'Hidden' }
           
           New-Item -ItemType Directory -Force -Path release_assets
@@ -116,6 +127,9 @@ jobs:
       - name: Build with Nuitka (macOS DMG)
         if: runner.os == 'macOS'
         run: |
+          # Limpar motores de Windows e Linux antes de compilar
+          rm -f bin/*.exe bin/7z bin/extract-xiso bin/zarchive
+          
           mkdir -p img/icon.iconset
           sips -z 16 16     img/icon.png --out img/icon.iconset/icon_16x16.png
           sips -z 32 32     img/icon.png --out img/icon.iconset/icon_16x16@2x.png
