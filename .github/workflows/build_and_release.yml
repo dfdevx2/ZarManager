@@ -96,7 +96,7 @@ jobs:
         shell: powershell
         run: |
           # 1. Compilar SEM o Nuitka mexer no bin (vamos fazer isso manualmente para garantir!)
-          python -m nuitka --standalone --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
+          python -m nuitka --standalone --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-uac-admin --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
           
           Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
           Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Windows"
