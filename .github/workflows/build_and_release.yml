@@ -250,17 +250,28 @@ jobs:
           sips -z 512 512 img/icon.png --out img/icon.iconset/icon_256x256@2x.png
           iconutil -c icns img/icon.iconset
 
+          # bin/ NÃO entra como --include-data-dir aqui de propósito: o
+          # Nuitka assina o .app sozinho assim que acaba de o empacotar (é
+          # obrigatório em bundles macOS), e a validação estrita do codesign
+          # rejeita executáveis nativos soltos (como o PkgTool.Core-mac, um
+          # binário AOT do dotnet) dentro do bundle nessa fase --
+          # "main executable failed strict validation". O bin/ é copiado
+          # a seguir, depois do Nuitka já ter empacotado e assinado o resto,
+          # e assinamos tudo de novo no fim, já com bin/ lá dentro, numa
+          # única passagem que não tem essa validação estrita pelo meio.
           python -m nuitka \
             --standalone \
             --macos-create-app-bundle \
             --macos-app-icon=img/icon.icns \
             --enable-plugin=pyside6 \
             --include-qt-plugins=multimedia \
-            --include-data-dir=bin=bin \
             --include-data-dir=assets=assets \
             --include-data-files=img/icon.png=img/icon.png \
             --output-dir=dist \
             app.py
+
+          cp -R bin dist/app.app/Contents/MacOS/bin
+          chmod +x dist/app.app/Contents/MacOS/bin/* 2>/dev/null || true
 
           codesign --force --deep -s - dist/app.app
 
