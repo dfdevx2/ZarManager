@@ -273,6 +273,15 @@ jobs:
           cp -R bin dist/app.app/Contents/MacOS/bin
           chmod +x dist/app.app/Contents/MacOS/bin/* 2>/dev/null || true
 
+          # codesign --deep valida estritamente CADA executável nativo dentro
+          # do bundle, incluindo os que acabámos de copiar para bin/. O
+          # PkgTool.Core-mac (binário AOT do dotnet) reprova essa validação
+          # quando é assinado apenas como parte da passagem --deep do bundle
+          # inteiro. Assinando-o primeiro, individualmente, com a sua própria
+          # assinatura ad-hoc, o --deep do bundle deixa de o re-validar do
+          # zero e apenas confirma a assinatura já existente.
+          find dist/app.app/Contents/MacOS/bin -type f -perm +111 -exec codesign --force -s - {} \;
+
           codesign --force --deep -s - dist/app.app
 
           HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
