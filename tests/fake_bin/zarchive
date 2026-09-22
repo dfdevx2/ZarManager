@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""zarchive falso: <pasta> <saida.zar>."""
+import os, sys, time
+
+src, dst = sys.argv[1], sys.argv[2]
+slow = float(os.environ.get("ZAR_FAKE_SLOW", "0"))
+
+for pct in (0, 33, 66, 100):
+    sys.stdout.write(f"\rcompressing {pct}%")
+    sys.stdout.flush()
+    if slow:
+        time.sleep(slow / 4)
+print()
+
+if os.environ.get("ZAR_FAKE_FAIL") == "zar":
+    print("fatal: compression failed")
+    sys.exit(2)
+
+count = sum(len(files) for _, _, files in os.walk(src))
+with open(dst, "wb") as fh:
+    fh.write(b"ZARF" + str(count).encode())
+sys.exit(0)

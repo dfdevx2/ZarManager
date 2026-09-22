@@ -11,9 +11,22 @@
 
 # ZarManager
 
-ZarManager is a robust, cross-platform graphical utility designed to automate the heavy lifting of XISO extraction and batch compression into highly optimized `.zar` archives. By wrapping powerful command-line backend tools into a sleek, asynchronous interface, it completely streamlines retro game archiving and storage management.
+ZarManager exists because a game backup collection is rarely in the format
+you actually want it in. A folder ends up mixing `.zip`s, raw `.iso`s, split
+Xbox 360 downloads and loose game folders — and turning that into something
+consistent, playable and disk-space-reasonable normally means learning half a
+dozen different command-line tools, each with its own flags and quirks.
 
-## 📸 Interface & Features
+ZarManager is a cross-platform desktop front-end for that whole job. Point it
+at a folder, and it figures out what each file actually is by reading its
+header (not trusting the extension), works out the shortest chain of steps to
+get it into your target format, and runs the right engine for each step —
+7-Zip, extract-xiso, ZArchive, chdman, DolphinTool, PkgTool.Core, or its own
+built-in Xbox 360 container readers — in the background, with real progress,
+pause and cancel. A whole library goes in one queue and comes out the other
+side already organized, without babysitting eighteen terminal windows.
+
+## 📸 Interface
 
 <p align="center">
   <img src="img/print1.png" alt="ZarManager Interface 1" width="49%">
@@ -24,63 +37,130 @@ ZarManager is a robust, cross-platform graphical utility designed to automate th
   <img src="img/print4.png" alt="ZarManager Interface 4" width="49%">
 </p>
 
-## 🚀 Key Features
+## 🚀 Features
 
-* **Automated Smart Pipeline:** Point it to a directory and ZarManager will identify `.zip`, `.rar`, `.7z`, and `.iso` files, sequentially run unzipping, XISO extraction, and `.zar` compression, cleaning up temporary residue automatically.
-* **Multi-Threaded Engine:** Features dynamic thread clamping. It uses native background concurrency (`QThread`) to process batches parallelly without freezing the UI, maximizing your HDD/SSD I/O efficiency while preventing "ghost processes".
-* **Data Safety & Integrity:** Automatic handling of file collisions with granular user prompts to *Overwrite*, *Skip*, or *Keep* original files after successful generation.
-* **Dynamic Customization:** Switch between multiple visual themes (Pitch Black, White, Steam, Xbox) and localization languages (English, PT-BR) on the fly, with native macOS styling support.
-* **First-Boot Guidance:** Incorporates an overlay tutorial and seamless hover balloon-tips across the UI to ensure any user understands complex processing options effortlessly.
+* **Format detection by magic bytes.** The pipeline reads the file header
+  instead of trusting the extension — `.iso` alone cannot tell you whether a
+  disc is Xbox, GameCube, Wii or PS2. After each step the result is
+  re-identified, which is what lets `zip → iso → archive` chain by itself.
+* **Modular pipeline.** Each engine is a *stage* declaring what it consumes
+  and what it produces; a planner finds the shortest route to the target
+  format. Adding an engine is adding one file.
+* **Native readers for Xbox 360 containers.** STFS packages (XBLA, DLC, title
+  updates) and Games on Demand/SVOD images are parsed in pure Python — no
+  binary to install, nothing an antivirus can quarantine.
+* **Transactional batches.** Everything intermediate is written to a hidden
+  work folder inside the destination. Originals are deleted only once the
+  final artifact is in place — a late failure costs you nothing.
+* **Real cancel and pause.** Cancelling interrupts the running engine instead
+  of waiting for it; pausing suspends the process itself on Linux and macOS.
+* **Parallel batches** with a shared queue and collision handling
+  (skip, replace, auto-rename) that is safe across workers.
+* **Four themes** (Pitch Black, White, Steam, Xbox), English and PT-BR,
+  subtle UI sound effects, and a *reduce motion* switch.
+* **Troubleshooting built in.** Help → Check engines shows exactly which
+  binary is present, where it was found, and its version — before you queue a
+  job that would otherwise fail halfway through.
 
-## 🛠️ Core Technologies & Credits
+## 🧭 Supported chains
 
-ZarManager acts as a smart workflow wrapper for some of the best open-source archival engines available. The core operations rely on:
-* **[extract-xiso](https://github.com/XboxDev/extract-xiso):** The premier utility by *XboxDev* for creating and extracting Xbox XDVDFS ISO images.
-* **[zarchive](https://github.com/vasi/zarchive):** The revolutionary compression format designed by *Vasi*, allowing for real-time seekable compressed data.
-* **[7-Zip](https://www.7-zip.org/):** The industry standard for robust file archiving.
-* **[PySide6](https://doc.qt.io/qtforpython-6/):** The official Python module from the *Qt for Python* project providing the native interface.
+| Input | Detected as | Result |
+|---|---|---|
+| `.zip` `.rar` `.7z` | archive | extracted, then re-identified and chained |
+| Xbox / Xbox 360 `.iso` | XDVDFS | extracted, then compressed to `.zar` |
+| XBLA title, DLC, title update | STFS package | extracted natively, then compressed to `.zar` |
+| Games on Demand (`data0000`, …) | GOD / SVOD | image rebuilt natively, extracted, then `.zar` |
+| Game folder | game folder | `.zar` |
+| GameCube / Wii `.iso` | GC / Wii | `.rvz` (via `DolphinTool`) |
+| PS1 / PS2 `.iso`, `.cue` / `.gdi` | ISO9660 / CD | `.chd` (via `chdman`) |
+| PS3 / PS4 `.pkg` | package | extracted, then `.zar` (via `PkgTool.Core`) |
 
-> 🤖 **AI-Assisted Development:** The codebase concurrency, PySide6 thread synchronization, error handling logic, and robust Nuitka cross-OS packaging pipelines were rigorously debugged, refined, and documented with the assistance of Artificial Intelligence.
+Every engine above ships inside `bin/` for Windows, Linux and macOS — nothing
+to download or configure separately. Xbox 360 containers (STFS and GOD/SVOD)
+need no binary at all, since they're read directly by ZarManager itself.
 
-## 🩺 Troubleshooting & Common Errors
+Two caveats worth knowing, both detailed in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). **Games on Demand** support
+has not yet been confirmed against a retail package: the reader picks its
+geometry by validating against the disc signature and refuses to write an
+image when nothing validates, so it fails loudly rather than quietly producing
+garbage — but a real package is what would settle it. **PKG** only handles
+fPKG/debug packages; a retail PS4 package is encrypted and out of scope for
+any current open-source tool. shadPS4 itself reads `.zar` natively as of
+0.17.0, so `PKG → folder → .zar` has a real destination once you have an
+fPKG to feed it.
 
-If ZarManager fails to process items, it will trigger an automated environment scan. Here are the most common OS-specific issues and their immediate fixes:
+## 📦 Install
 
-### 🪟 Windows
-* **Error:** Processing stops instantly and logs `[CRITICAL ERROR] Missing Engines`.
-* **Cause:** Since ZarManager is packed as a single `.exe` file, it extracts its background engines to `%TEMP%` at runtime. **Windows Defender** (or other AVs) frequently misinterprets this and silently deletes the tools as a False Positive.
-* **Fix:** Add the `ZarManager.exe` file to your Antivirus **Exclusions** list and restart the app.
+* **Windows** — download `ZarManager-vX.Y.Z-Windows.zip` and unzip it
+  anywhere. It is a **portable folder**: `ZarManager.exe` and the `bin` folder
+  must stay together. If your antivirus removes anything from `bin`, exclude
+  the whole folder.
+* **Linux** — download the `.AppImage`, `chmod +x` it, run it. Needs FUSE.
+  > ⚠️ **Known issue:** UI sound effects don't play on at least some Linux
+  > builds — the interface stays fully functional, just silent. This is
+  > being tracked; see the [1.3.0 changelog entry](CHANGELOG.md) for what's
+  > already been ruled out.
+* **macOS** — download the `.dmg`. Gatekeeper flags unsigned binaries; clear
+  the quarantine with `xattr -cr /Applications/ZarManager.app`.
 
-### 🍏 macOS
-* **Error:** macOS says *"App is damaged and can't be opened"* or the background tools fail.
-* **Cause:** Apple's *Gatekeeper* quarantines applications downloaded from the internet that lack expensive Apple Developer certificates.
-* **Fix:** Open the macOS `Terminal` and run the following command to remove the quarantine flag: 
-  ```bash
-  xattr -cr /Applications/ZarManager.app
-  ```
+Settings live in your user config directory (`%APPDATA%`, `~/.config`,
+`~/Library/Application Support`). Put an empty `portable.txt` next to the
+executable to keep them in the program folder instead.
 
-### 🐧 Linux
-* **Error:** The `.AppImage` refuses to launch or silently fails during extraction.
-* **Cause:** Missing execution permissions or missing AppImage base libraries.
-* **Fix:** Right-click the `.AppImage` file > **Properties** > Enable **"Allow executing file as program"**. Also, make sure you have `libfuse2` installed on your distribution (e.g., `sudo apt install libfuse2`).
+## 🛠️ Engines and credits
 
-## ⚙️ Compilation (Build from Source)
+ZarManager is a workflow wrapper around open-source archival engines. Each is
+a separate program with its own license, bundled as-is:
 
-The project uses Nuitka to compile standalone native binaries. To compile the application yourself:
+* **[extract-xiso](https://github.com/XboxDev/extract-xiso)** — Xbox XDVDFS
+  images, by *XboxDev*. BSD-3-Clause.
+* **[ZArchive](https://github.com/Exzap/ZArchive)** — the seekable
+  zstd-compressed `.zar` format, by *Exzap* (Cemu). MIT.
+* **[7-Zip](https://www.7-zip.org/)** — archive extraction. LGPL-2.1, with the
+  unRAR restriction.
+* **[chdman](https://www.mamedev.org/)** (MAME) — CHD compression for CD/DVD
+  formats (PS1, PS2, Dreamcast, and others MAME supports). GPL-2.0-or-later.
+* **[DolphinTool](https://dolphin-emu.org/)** — RVZ compression for GameCube
+  and Wii images, from the Dolphin project. GPL-2.0-or-later.
+* **[PkgTool.Core](https://github.com/maxton/LibOrbisPkg)** (LibOrbisPkg) —
+  PS3/PS4 `.pkg` extraction, by *maxton*. LGPL-3.0.
+* **[PySide6](https://doc.qt.io/qtforpython-6/)** — the Qt interface.
 
-1. Clone the repository and setup the Python environment:
-    ```bash
-    git clone [https://github.com/dfdevx2/ZarManager.git](https://github.com/dfdevx2/ZarManager.git)
-    cd ZarManager
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
-    pip install -r requirements.txt
-    ```
-2. Build with Nuitka (adjust parameters per OS):
-    ```bash
-    python -m nuitka --onefile --enable-plugin=pyside6 --include-data-dir=bin=bin --output-dir=dist app.py
-    ```
+STFS and GOD/SVOD (Xbox 360) support has no external engine — it's read
+directly by ZarManager's own code.
+
+## 🧑‍💻 Development
+
+```bash
+git clone https://github.com/dfdevx2/ZarManager.git
+cd ZarManager
+pip install -r requirements.txt
+python app.py
+```
+
+Tests need neither Qt nor a display — the core has no Qt dependency at all,
+and the UI is exercised against a stub in `tests/qt_stub`:
+
+```bash
+python tests/test_pipeline.py    # pipeline end-to-end, with fake engines
+python tests/test_ui_smoke.py    # imports, screen construction, locale keys
+```
+
+Regenerate the interface sounds with `python tools/make_sfx.py`.
 
 ## 📜 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+ZarManager is released under a **non-commercial license** — use, copy and
+modify freely for non-commercial purposes; selling it or any derived product
+is prohibited. See [`LICENSE`](LICENSE) for the exact terms.
+
+> Earlier versions of this README claimed MIT. That was never what `LICENSE`
+> said; the non-commercial terms are the ones that apply.
+
+The bundled engines keep their own licenses, listed above and in the About
+screen.
+
+> 🤖 **AI-assisted development:** concurrency, Qt thread synchronisation,
+> error handling and the Nuitka packaging pipeline were debugged, refined and
+> documented with the assistance of AI.

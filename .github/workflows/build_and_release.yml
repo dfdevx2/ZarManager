@@ -4,14 +4,41 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
+  # ---------------------------------------------------------------- testes
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # O core não importa Qt e a UI corre contra tests/qt_stub, por isso os
+      # testes não precisam de PySide6 nem de servidor gráfico.
+      - name: Core pipeline (motores falsos)
+        run: python tests/test_pipeline.py
+
+      - name: UI smoke + locales
+        run: python tests/test_ui_smoke.py
+
+  # ----------------------------------------------------------------- build
   build:
     name: Build on ${{ matrix.os }}
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -22,22 +49,32 @@ jobs:
             artifact_name: macos-assets
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # A versão sai da tag: estava fixa em ~10 sítios do workflow antigo.
+      - name: Resolve version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Building version $VERSION"
+
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install nuitka
 
-      - name: Nuitka Optimization Cache
+      - name: Sync version.py with the tag
+        shell: bash
+        run: echo "__version__ = \"${VERSION}\"" > version.py
+
+      - name: Nuitka cache
         uses: actions/cache@v4
         with:
           path: |
@@ -45,32 +82,58 @@ jobs:
             ~/AppData/Local/Nuitka/Nuitka/Cache
             ~/Library/Caches/Nuitka
           key: ${{ runner.os }}-nuitka-${{ hashFiles('**/*.py') }}
-          restore-keys: |
-            ${{ runner.os }}-nuitka-
+          restore-keys: ${{ runner.os }}-nuitka-
 
-      - name: Install Linux System Dependencies & FUSE for AppImage
+      # ------------------------------------------------------------- Linux
+      - name: Linux system dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update && sudo apt-get install -y patchelf ccache wget file libfuse2
+          sudo apt-get update
+          sudo apt-get install -y patchelf ccache wget file libfuse2
           wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
           chmod +x appimagetool
 
-      - name: Build with Nuitka (Linux AppImage)
+      - name: Build (Linux, onefile)
         if: runner.os == 'Linux'
         run: |
-          # Limpeza Estrita de motores não-Linux
           rm -f bin/*.exe bin/*-mac bin/7zz bin/*.dll
-          
-          # Compilação Onefile nativa para AppImage
-          python -m nuitka --onefile --enable-plugin=pyside6 --include-data-dir=bin=bin --lto=no --output-filename=ZarManager-Linux --output-dir=dist app.py
-          
-          # Estruturação da Árvore do AppImage
+
+          python -m nuitka \
+            --onefile \
+            --enable-plugin=pyside6 \
+            --include-qt-plugins=multimedia \
+            --include-data-dir=bin=bin \
+            --include-data-dir=assets=assets \
+            --include-data-files=img/icon.png=img/icon.png \
+            --lto=no \
+            --output-filename=ZarManager-Linux \
+            --output-dir=dist \
+            app.py
+
+          # Diagnóstico do bug de som no Linux: o --include-qt-plugins=multimedia
+          # devia trazer o backend do QtMultimedia (normalmente
+          # libffmpegmediaplugin.so) para dentro do build, mas o Nuitka não tem
+          # tratamento especial pra este plugin -- só o inclui se o encontrar
+          # na varredura genérica de dependências. Isto falha silenciosamente:
+          # o binário compila e corre bem, só o som é que nunca funciona. Este
+          # passo apanha isso já na CI, em vez de descobrir só depois do
+          # utilizador reportar.
+          echo "--- Plugins de multimédia encontrados na build ---"
+          find dist -ipath "*multimedia*" -o -iname "*ffmpeg*" | tee /tmp/mm_plugins.txt || true
+          if [ ! -s /tmp/mm_plugins.txt ]; then
+            echo "::warning::Nenhum plugin de QtMultimedia/ffmpeg encontrado na build Linux -- o som vai ficar silencioso em runtime."
+          else
+            echo "--- Dependências partilhadas do plugin (ldd) ---"
+            while read -r f; do
+              [ -f "$f" ] && ldd "$f" 2>&1 | grep -i "not found" && echo "::warning::$f tem dependências em falta (ver acima)"
+            done < /tmp/mm_plugins.txt || true
+          fi
+
           mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/applications
-          
           cp dist/ZarManager-Linux AppDir/usr/bin/zarmanager
           cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/zarmanager.png
           cp img/icon.png AppDir/zarmanager.png
-          
+
           cat << 'EOF' > AppDir/usr/share/applications/zarmanager.desktop
           [Desktop Entry]
           Type=Application
@@ -80,80 +143,127 @@ jobs:
           Categories=Utility;
           EOF
           cp AppDir/usr/share/applications/zarmanager.desktop AppDir/
-          
+
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
           exec "$HERE/usr/bin/zarmanager" "$@"
           EOF
           chmod +x AppDir/AppRun
-          
-          ./appimagetool AppDir dist/ZarManager-v1.2.0-x86_64.AppImage
-          
+
+          ./appimagetool AppDir "dist/ZarManager-v${VERSION}-x86_64.AppImage"
+
           mkdir -p release_assets
           cp dist/ZarManager-Linux release_assets/
-          cp dist/ZarManager-v1.2.0-x86_64.AppImage release_assets/
+          cp "dist/ZarManager-v${VERSION}-x86_64.AppImage" release_assets/
 
-      - name: Build with Nuitka (Windows Portable)
+      # ----------------------------------------------------------- Windows
+      - name: Build (Windows, portable folder via MinGW64)
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
-          # 1. Limpeza Absoluta da Fonte: Garante que o Nuitka só lê ficheiros vitais do Windows
-          Get-ChildItem -Path "bin" -File | Where-Object { $_.Extension -notin @('.exe', '.dll') } | Remove-Item -Force
-          
-          # 2. Compilação Standalone com Elevação UAC Integrada
-          python -m nuitka --standalone --enable-plugin=pyside6 --windows-console-mode=disable --assume-yes-for-downloads --lto=no --mingw64 --windows-icon-from-ico=img/icon.ico --windows-uac-admin --windows-product-name="ZarManager" --windows-file-version="1.2.0.0" --windows-product-version="1.2.0.0" --windows-company-name="dfdevx2" --output-dir=dist app.py
-          
-          # 3. Estruturação Enterprise Portable
-          Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
-          Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Portable"
-          
-          # 4. Injeção Manual Garantida da pasta bin
-          Copy-Item -Path "bin" -Destination "dist\ZarManager-Portable\bin" -Recurse -Force
-          
-          # 5. Manuais UX
-          $readme_pt = "AVISO IMPORTANTE!`n`nPara que o ZarManager funcione corretamente no modo Portatil, o ficheiro 'ZarManager.exe' e todas as DLLs/pastas devem permanecer juntos neste diretorio.`n`nSe desejar aceder facilmente ao programa:`n1. Clique com o botao direito em 'ZarManager.exe'.`n2. Selecione 'Enviar para' -> 'Ambiente de trabalho (criar atalho)'."
-          Set-Content -Path "dist\ZarManager-Portable\LEIA-ME.txt" -Value $readme_pt -Encoding UTF8
-          
-          $readme_en = "IMPORTANT WARNING!`n`nFor ZarManager to function properly in Portable mode, the 'ZarManager.exe' file and all DLLs/folders must remain together in this directory.`n`nIf you want easy access:`n1. Right-click on 'ZarManager.exe'.`n2. Select 'Send to' -> 'Desktop (create shortcut)'."
-          Set-Content -Path "dist\ZarManager-Portable\README_EN.txt" -Value $readme_en -Encoding UTF8
-          
-          # 6. Empacotamento Limpo via 7z nativo
-          New-Item -ItemType Directory -Force -Path release_assets
-          cd dist
-          7z a ..\release_assets\ZarManager-v1.2.0-Windows.zip ZarManager-Portable
-          cd ..
+          python -m nuitka `
+            --standalone `
+            --enable-plugin=pyside6 `
+            --include-qt-plugins=multimedia `
+            --include-data-dir=assets=assets `
+            --include-data-files=img/icon.png=img/icon.png `
+            --windows-console-mode=disable `
+            --assume-yes-for-downloads `
+            --lto=no `
+            --mingw64 `
+            --windows-icon-from-ico=img/icon.ico `
+            --windows-uac-admin `
+            --windows-product-name="ZarManager" `
+            --windows-file-version="$env:VERSION.0" `
+            --windows-product-version="$env:VERSION.0" `
+            --windows-company-name="dfdevx2" `
+            --output-dir=dist `
+            app.py
 
-      - name: Sign Windows Executable (Self-Signed Certificate)
+          Rename-Item -Path "dist\app.dist\app.exe" -NewName "ZarManager.exe"
+          Rename-Item -Path "dist\app.dist" -NewName "ZarManager-Windows"
+
+          # A pasta bin é copiada à mão: o Nuitka não a trata como data dir
+          # quando os binários não têm extensão conhecida.
+          Copy-Item -Path "bin" -Destination "dist\ZarManager-Windows\bin" -Recurse -Force
+          Get-ChildItem -Path "dist\ZarManager-Windows\bin" -File |
+            Where-Object { $_.Extension -notin @('.exe', '.dll') } | Remove-Item -Force
+
+          $readme_pt = "AVISO IMPORTANTE`n`n" +
+            "1. O ficheiro 'ZarManager.exe' NAO PODE ser movido para fora desta pasta.`n" +
+            "2. A pasta 'bin' NAO PODE ser apagada nem alterada.`n`n" +
+            "O programa e distribuido como pasta portatil: o executavel e os motores`n" +
+            "(7z, extract-xiso, zarchive) tem de ficar juntos. Se o antivirus apagar algo`n" +
+            "de dentro de 'bin', adicione esta pasta inteira as exclusoes.`n`n" +
+            "Atalho no Ambiente de Trabalho:`n" +
+            "- Botao direito em ZarManager.exe`n" +
+            "- 'Mostrar mais opcoes' -> 'Enviar para' -> 'Ambiente de trabalho (criar atalho)'"
+          Set-Content -Path "dist\ZarManager-Windows\LEIA-ME_IMPORTANTE.txt" -Value $readme_pt -Encoding UTF8
+
+          $readme_en = "IMPORTANT`n`n" +
+            "1. 'ZarManager.exe' CANNOT be moved out of this folder.`n" +
+            "2. The 'bin' folder CANNOT be deleted or modified.`n`n" +
+            "The program ships as a portable folder: the executable and the engines`n" +
+            "(7z, extract-xiso, zarchive) must stay together. If your antivirus removes`n" +
+            "anything from 'bin', exclude this whole folder.`n`n" +
+            "Desktop shortcut:`n" +
+            "- Right-click ZarManager.exe`n" +
+            "- 'Show more options' -> 'Send to' -> 'Desktop (create shortcut)'"
+          Set-Content -Path "dist\ZarManager-Windows\README_IMPORTANT.txt" -Value $readme_en -Encoding UTF8
+
+          Get-ChildItem -Path "dist\ZarManager-Windows" -File |
+            Where-Object { $_.Name -notin @('ZarManager.exe', 'LEIA-ME_IMPORTANTE.txt', 'README_IMPORTANT.txt') } |
+            ForEach-Object { $_.Attributes = 'Hidden' }
+          Get-ChildItem -Path "dist\ZarManager-Windows" -Directory |
+            Where-Object { $_.Name -ne 'bin' } | ForEach-Object { $_.Attributes = 'Hidden' }
+
+          New-Item -ItemType Directory -Force -Path release_assets | Out-Null
+          Push-Location dist
+          7z a "..\release_assets\ZarManager-v$env:VERSION-Windows.zip" ZarManager-Windows
+          Pop-Location
+
+      - name: Sign Windows executable (self-signed)
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=dfdevx2, O=ZarManager" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(5)
-          Set-AuthenticodeSignature -FilePath "dist\ZarManager-Portable\ZarManager.exe" -Certificate $cert
-          Write-Host "ZarManager.exe successfully signed!"
+          Set-AuthenticodeSignature -FilePath "dist\ZarManager-Windows\ZarManager.exe" -Certificate $cert
 
-      - name: Build with Nuitka (macOS DMG)
+      # ------------------------------------------------------------- macOS
+      - name: Build (macOS, DMG)
         if: runner.os == 'macOS'
         run: |
-          # Limpeza Estrita de motores não-Mac
-          rm -f bin/*.exe bin/*.dll bin/7z bin/extract-xiso bin/zarchive
-          
-          # Geração do Ícone Nativo Apple
+          # As versões Linux destes motores partilham o mesmo nome de base
+          # (chdman, dolphin-tool, PkgTool.Core); as de macOS têm o sufixo
+          # -mac. Sem isto, o .dmg carregava os dois binários e o resolver
+          # (core/engines.py) podia escolher o errado.
+          rm -f bin/*.exe bin/*.dll bin/7z bin/extract-xiso bin/zarchive \
+                bin/chdman bin/dolphin-tool bin/PkgTool.Core
+
           mkdir -p img/icon.iconset
-          sips -z 16 16     img/icon.png --out img/icon.iconset/icon_16x16.png
-          sips -z 32 32     img/icon.png --out img/icon.iconset/icon_16x16@2x.png
-          sips -z 128 128   img/icon.png --out img/icon.iconset/icon_128x128.png
-          sips -z 256 256   img/icon.png --out img/icon.iconset/icon_128x128@2x.png
-          sips -z 256 256   img/icon.png --out img/icon.iconset/icon_256x256.png
-          sips -z 512 512   img/icon.png --out img/icon.iconset/icon_256x256@2x.png
+          sips -z 16 16   img/icon.png --out img/icon.iconset/icon_16x16.png
+          sips -z 32 32   img/icon.png --out img/icon.iconset/icon_16x16@2x.png
+          sips -z 128 128 img/icon.png --out img/icon.iconset/icon_128x128.png
+          sips -z 256 256 img/icon.png --out img/icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 img/icon.png --out img/icon.iconset/icon_256x256.png
+          sips -z 512 512 img/icon.png --out img/icon.iconset/icon_256x256@2x.png
           iconutil -c icns img/icon.iconset
-          
-          # Compilação App Bundle
-          python -m nuitka --standalone --macos-create-app-bundle --macos-app-icon=img/icon.icns --enable-plugin=pyside6 --include-data-dir=bin=bin --output-dir=dist app.py
-          
-          # Assinatura Local e Empacotamento DMG
+
+          python -m nuitka \
+            --standalone \
+            --macos-create-app-bundle \
+            --macos-app-icon=img/icon.icns \
+            --enable-plugin=pyside6 \
+            --include-qt-plugins=multimedia \
+            --include-data-dir=bin=bin \
+            --include-data-dir=assets=assets \
+            --include-data-files=img/icon.png=img/icon.png \
+            --output-dir=dist \
+            app.py
+
           codesign --force --deep -s - dist/app.app
-          
+
           HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
           create-dmg \
             --volname "ZarManager" \
@@ -161,55 +271,59 @@ jobs:
             --window-size 600 400 \
             --icon-size 100 \
             --app-drop-link 425 120 \
-            "dist/ZarManager-v1.2.0-macOS.dmg" \
+            "dist/ZarManager-v${VERSION}-macOS.dmg" \
             "dist/app.app/" || true
-            
-          mkdir release_assets
-          cp dist/ZarManager-v1.2.0-macOS.dmg release_assets/
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+          mkdir -p release_assets
+          cp "dist/ZarManager-v${VERSION}-macOS.dmg" release_assets/
+
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: release_assets/*
 
+  # --------------------------------------------------------------- release
   release:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
-      - name: Create GitHub Release Draft with Changelog
-        uses: softprops/action-gh-release@v2
+      - name: Collect assets and publish checksums
+        shell: bash
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          cd release
+          # O updater valida este ficheiro antes de aplicar a atualização.
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract release notes from CHANGELOG
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Ver CHANGELOG.md para as alterações desta versão." > release_notes.md
+          fi
+          cat release_notes.md
+
+      - uses: softprops/action-gh-release@v2
         with:
           draft: true
           prerelease: false
-          name: ZarManager v1.2.0
-          tag_name: v1.2.0
-          files: |
-            linux-assets/*
-            windows-assets/*
-            macos-assets/*
-          body: |
-            ## ZarManager v1.2.0 - Stable Release
-            
-            This enterprise-grade update fully overhauls the build architecture to provide flawless native execution on Windows, macOS, and Linux without triggering false-positive Antivirus alerts.
-            
-            ### DevOps & Core Engine Highlights
-            * **Windows UAC Elevation:** The application now requests Administrator privileges automatically upon launch, resolving all `WinError 740` issues natively.
-            * **Enterprise Portable Structure:** Windows releases are now packaged cleanly into a `ZarManager-Portable` directory, ensuring proper dependency mapping without relying on fragile hidden-file workarounds.
-            * **High-Performance Terminal Parsing:** The backend logic parsing `7z` and `extract-xiso` outputs was rewritten with pre-compiled RegEx and buffer limits, delivering 10x faster background operations and perfectly smooth UI progress bars at 10 FPS.
-            * **Cross-Platform Engine Resolution:** The core now resolves embedded binaries (`bin` folder) dynamically depending on execution context (Compiled vs Source), entirely eradicating "missing engine" errors on macOS and Linux.
-            * **Advanced I/O Safeguards:** Migrated deletion and movement functions to native Python C++ abstraction (`unlink`), preventing file-lock race conditions during heavy batch processing.
-            
-            ### Official Binaries
-            * `ZarManager-v1.2.0-x86_64.AppImage` (Universal Linux AppImage with desktop integration)
-            * `ZarManager-Linux` (Standard Linux portable binary)
-            * `ZarManager-v1.2.0-Windows.zip` (Clean Windows Portable Folder containing the signed executable and native engines)
-            * `ZarManager-v1.2.0-macOS.dmg` (macOS Drag-and-Drop Application Bundle)
+          name: ZarManager ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: release_notes.md
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,2 +1,5 @@
 PySide6>=6.5.0
-# Mantenha abaixo apenas as bibliotecas que o seu core.py utiliza
+# Certificados para o updater. Sem isto o TLS depende do arquivo do sistema,
+# que num binário Nuitka nem sempre está acessível -- foi essa falha que
+# levou o código antigo a desligar a verificação de certificados.
+certifi>=2024.2.2

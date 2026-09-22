@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""extract-xiso falso: -d <dir> -x <iso>."""
+import os, sys, time
+
+args = sys.argv[1:]
+out = args[args.index("-d") + 1]
+src = args[args.index("-x") + 1]
+
+slow = float(os.environ.get("ZAR_FAKE_SLOW", "0"))
+for pct in (10, 40, 80, 100):
+    sys.stdout.write(f"\rextracting {pct}%")
+    sys.stdout.flush()
+    if slow:
+        time.sleep(slow / 4)
+print()
+
+if os.environ.get("ZAR_FAKE_FAIL") == "xiso":
+    sys.exit(3)
+
+os.makedirs(out, exist_ok=True)
+with open(os.path.join(out, "default.xex"), "wb") as fh:
+    fh.write(b"XEX2fake")
+os.makedirs(os.path.join(out, "media"), exist_ok=True)
+with open(os.path.join(out, "media", "asset.bin"), "wb") as fh:
+    fh.write(b"\0" * 64)
+sys.exit(0)

@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""7-Zip falso: extrai um zip real e reporta progresso como o -bsp1."""
+import os, sys, time, zipfile
+
+args = sys.argv[1:]
+if not args or args[0] != "x":
+    sys.exit(0)
+src = args[1]
+out = next(a[2:] for a in args if a.startswith("-o"))
+
+slow = float(os.environ.get("ZAR_FAKE_SLOW", "0"))
+for pct in (0, 25, 50, 75, 100):
+    sys.stdout.write(f"\r  {pct}% 3 - a extrair {os.path.basename(src)}")
+    sys.stdout.flush()
+    if slow:
+        time.sleep(slow / 5)
+print()
+
+if os.environ.get("ZAR_FAKE_FAIL") == "7z":
+    print("ERROR: Nao foi possivel abrir o ficheiro")
+    sys.exit(2)
+
+os.makedirs(out, exist_ok=True)
+with zipfile.ZipFile(src) as zf:
+    zf.extractall(out)
+
+# Codigo 1 = aviso inofensivo (timestamps, atributos NTFS). Tem de ser tolerado.
+sys.exit(1 if os.environ.get("ZAR_FAKE_RC1") else 0)

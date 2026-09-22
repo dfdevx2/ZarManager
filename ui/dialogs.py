@@ -1,52 +1,52 @@
-from PySide6.QtWidgets import QMessageBox, QFileDialog, QWidget
-from typing import Optional, List
+"""Diálogos.
+
+`ask_custom` passou a devolver a CHAVE da opção e não o texto do botão. Antes,
+o chamador comparava strings traduzidas para saber o que o utilizador
+escolheu -- bastava mudar uma tradução para partir a lógica.
+"""
+
+from __future__ import annotations
+
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
+
 
 class DialogManager:
-    """
-    Gestor centralizado de janelas de diálogo nativas usando PySide6.
-    Garante que os avisos e seletores de pastas seguem o tema do sistema operativo.
-    """
-    
     @staticmethod
-    def show_error(parent: Optional[QWidget], title: str, text: str):
+    def show_error(parent: QWidget | None, title: str, text: str) -> None:
         QMessageBox.critical(parent, title, text)
 
     @staticmethod
-    def show_warning(parent: Optional[QWidget], title: str, text: str):
+    def show_warning(parent: QWidget | None, title: str, text: str) -> None:
         QMessageBox.warning(parent, title, text)
 
     @staticmethod
-    def show_info(parent: Optional[QWidget], title: str, text: str):
+    def show_info(parent: QWidget | None, title: str, text: str) -> None:
         QMessageBox.information(parent, title, text)
 
     @staticmethod
-    def select_directory(parent: Optional[QWidget], title: str, start_dir: str = "") -> str:
-        """Abre o seletor nativo de pastas do sistema."""
+    def select_directory(parent: QWidget | None, title: str, start_dir: str = "") -> str:
         return QFileDialog.getExistingDirectory(
-            parent, 
-            title, 
-            start_dir,
-            QFileDialog.Option.ShowDirsOnly
+            parent, title, start_dir, QFileDialog.Option.ShowDirsOnly
         )
 
     @staticmethod
-    def ask_custom(parent: Optional[QWidget], title: str, text: str, buttons: List[str]) -> str:
-        """
-        Cria uma caixa de diálogo com botões personalizados (ex: Sobrescrever, Pular, Cancelar)
-        e devolve o texto do botão exato que o utilizador clicou.
-        """
-        msg_box = QMessageBox(parent)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(text)
-        msg_box.setIcon(QMessageBox.Icon.Question)
+    def ask_custom(
+        parent: QWidget | None,
+        title: str,
+        text: str,
+        options: list[tuple[str, str]],
+        icon: QMessageBox.Icon = QMessageBox.Icon.Question,
+    ) -> str | None:
+        """options: [(chave, rótulo), ...]. Devolve a chave escolhida."""
+        box = QMessageBox(parent)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setIcon(icon)
 
-        for btn_text in buttons:
-            msg_box.addButton(btn_text, QMessageBox.ButtonRole.ActionRole)
-            
-        msg_box.exec()
-        
-        # Identifica qual foi o botão clicado para devolver a string
-        if msg_box.clickedButton():
-            return msg_box.clickedButton().text()
-            
-        return ""
+        buttons = {}
+        for key, label in options:
+            button = box.addButton(label, QMessageBox.ButtonRole.ActionRole)
+            buttons[button] = key
+
+        box.exec()
+        return buttons.get(box.clickedButton())

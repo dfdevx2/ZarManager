@@ -1,176 +1,174 @@
+"""Diálogo de atualização."""
+
+from __future__ import annotations
+
 import json
-import urllib.request
-from urllib.error import URLError
+import platform
 import tempfile
-import ssl
+import webbrowser
 from pathlib import Path
+from urllib.error import URLError
 
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QTextBrowser, QProgressBar
+    QDialog, QHBoxLayout, QLabel, QProgressBar, QTextBrowser, QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QFont
 
-import locales
-from services.updater_service import UpdaterService, DownloadThread
+from services.logging_service import logger
+from services.updater_service import DownloadThread, UpdaterService, open_url
+from services.versioning import is_newer, normalize
+from ui.widgets.card import action_button
+
+RELEASE_API = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
+RELEASE_PAGE = "https://github.com/dfdevx2/ZarManager/releases/latest"
+
 
 class GitHubFetchThread(QThread):
     result_signal = Signal(dict)
     error_signal = Signal(str)
 
-    def run(self):
-        url = "https://api.github.com/repos/dfdevx2/ZarManager/releases/latest"
-        req = urllib.request.Request(url, headers={'User-Agent': 'ZarManager-App'})
+    def run(self) -> None:
         try:
-            # Ignora a verificação rígida de certificados que causa o erro SSL no Python compilado
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
-                data = json.loads(response.read().decode())
-                self.result_signal.emit(data)
-        except URLError as e:
-            self.error_signal.emit(f"Falha de rede: {e.reason}")
-        except Exception as e:
-            self.error_signal.emit(str(e))
+            with open_url(RELEASE_API, timeout=12) as response:
+                self.result_signal.emit(json.loads(response.read().decode("utf-8")))
+        except URLError as exc:
+            self.error_signal.emit(str(exc.reason))
+        except Exception as exc:
+            logger.info("Falha ao consultar releases: %s", exc)
+            self.error_signal.emit(str(exc))
+
 
 class UpdateDialog(QDialog):
-    def __init__(self, current_version: str, lang: str = "pt-br", parent=None, pre_fetched_data=None):
+    def __init__(self, current_version: str, translator, parent=None, pre_fetched: dict | None = None):
         super().__init__(parent)
-        self.current_version = current_version.lower().replace("v", "")
-        self.lang = lang
-        self.release_data = None
-        self.dl_thread = None
-        
-        self._build_ui()
-        
-        if pre_fetched_data:
-            self._on_fetch_success(pre_fetched_data)
+        self.t = translator
+        self.current_version = normalize(current_version)
+        self.release: dict | None = None
+        self.download: DownloadThread | None = None
+
+        self._build()
+
+        if pre_fetched:
+            self._on_release(pre_fetched)
         else:
-            self._fetch_data()
+            self.fetch = GitHubFetchThread(self)
+            self.fetch.result_signal.connect(self._on_release)
+            self.fetch.error_signal.connect(self._on_error)
+            self.fetch.start()
 
-    def get_text(self, key: str, fallback: str = "") -> str:
-        return locales.get_text(self.lang, key) or fallback
+    def _build(self) -> None:
+        self.setWindowTitle(self.t("upd_title"))
+        self.setMinimumSize(620, 470)
 
-    def _build_ui(self):
-        t_title = self.get_text("msg_update_popup_title", "Atualização Disponível")
-        self.setWindowTitle(t_title)
-        self.setMinimumSize(650, 500)
-        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
-        
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        
-        self.lbl_title = QLabel(self.get_text("msg_checking_update", "Procurando atualizações..."))
-        font = QFont()
-        font.setPointSize(18)
-        font.setBold(True)
-        self.lbl_title.setFont(font)
-        
-        self.lbl_subtitle = QLabel(f"Versão Instalada: v{self.current_version}")
-        self.lbl_subtitle.setStyleSheet("color: #888888; font-weight: bold;")
-        
-        self.changelog_box = QTextBrowser()
-        self.changelog_box.setOpenExternalLinks(True)
-        
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(12)
+
+        self.lbl_title = QLabel(self.t("upd_checking"))
+        self.lbl_title.setProperty("role", "section")
+        self.lbl_sub = QLabel(self.t("upd_installed", version=f"v{self.current_version}"))
+        self.lbl_sub.setProperty("role", "muted")
+
         self.progress = QProgressBar()
+        self.progress.setProperty("variant", "thin")
         self.progress.setRange(0, 0)
-        self.progress.setFixedHeight(4)
         self.progress.setTextVisible(False)
-        
-        btn_layout = QHBoxLayout()
-        self.btn_later = QPushButton(self.get_text("btn_exit_no", "Lembrar Mais Tarde"))
-        self.btn_later.setMinimumHeight(35)
+
+        self.changelog = QTextBrowser()
+        self.changelog.setOpenExternalLinks(True)
+
+        self.btn_later = action_button(self.t("btn_later"), "ghost")
+        self.btn_action = action_button(self.t("btn_download_update"), "primary")
         self.btn_later.clicked.connect(self.reject)
-        
-        self.btn_update = QPushButton(self.get_text("btn_download_update", "Atualizar Agora"))
-        self.btn_update.setMinimumHeight(35)
-        self.btn_update.setEnabled(False)
-        self.btn_update.setStyleSheet("background-color: #2ecc71; color: black; font-weight: bold; padding: 0px 20px;")
-        self.btn_update.clicked.connect(self._start_download)
-        
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.btn_later)
-        btn_layout.addWidget(self.btn_update)
-        
+        self.btn_action.clicked.connect(self._start_download)
+        self.btn_action.setEnabled(False)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        buttons.addWidget(self.btn_later)
+        buttons.addWidget(self.btn_action)
+
         layout.addWidget(self.lbl_title)
-        layout.addWidget(self.lbl_subtitle)
+        layout.addWidget(self.lbl_sub)
         layout.addWidget(self.progress)
-        layout.addWidget(self.changelog_box)
-        layout.addLayout(btn_layout)
+        layout.addWidget(self.changelog, 1)
+        layout.addLayout(buttons)
 
-    def _fetch_data(self):
-        self.thread = GitHubFetchThread()
-        self.thread.result_signal.connect(self._on_fetch_success)
-        self.thread.error_signal.connect(self._on_fetch_error)
-        self.thread.start()
-
-    def _on_fetch_success(self, data):
+    # -------------------------------------------------------------- estados
+    def _on_release(self, data: dict) -> None:
+        self.release = data
         self.progress.hide()
-        self.release_data = data
-        
-        latest_version = data.get("tag_name", "").lower().replace("v", "")
-        body_markdown = data.get("body", "Nenhum changelog disponível.")
-        
-        self.changelog_box.setMarkdown(body_markdown)
-        
-        if latest_version > self.current_version:
-            t_avail = self.get_text("msg_update_avail", "Nova versão disponível!").format("v" + latest_version)
-            self.lbl_title.setText(f"🚀 {t_avail}")
-            self.btn_update.setEnabled(True)
+
+        latest = normalize(data.get("tag_name", ""))
+        self.changelog.setMarkdown(data.get("body") or "")
+
+        if is_newer(latest, self.current_version):
+            self.lbl_title.setText(self.t("upd_available", version=f"v{latest}"))
+            self.btn_action.setEnabled(True)
+            return
+
+        self.lbl_title.setText(self.t("upd_latest", version=f"v{latest}"))
+        self.btn_action.setText(self.t("btn_close"))
+        self.btn_action.setProperty("variant", "ghost")
+        self.btn_action.setEnabled(True)
+        try:
+            self.btn_action.clicked.disconnect()
+        except RuntimeError:
+            pass
+        self.btn_action.clicked.connect(self.accept)
+        self.btn_later.hide()
+
+    def _on_error(self, message: str) -> None:
+        self.progress.hide()
+        if message == "checksum":
+            self.lbl_title.setText(self.t("upd_checksum_failed"))
         else:
-            t_latest = self.get_text("msg_update_latest", "O sistema está atualizado.").format("v" + latest_version)
-            self.lbl_title.setText(f"✅ {t_latest}")
-            self.btn_update.setText("Fechar")
-            self.btn_update.setStyleSheet("") 
-            self.btn_update.setEnabled(True)
-            self.btn_update.clicked.disconnect()
-            self.btn_update.clicked.connect(self.accept)
-            self.btn_later.hide()
+            self.lbl_title.setText(self.t("upd_error"))
+            self.changelog.setPlainText(message)
+        self.btn_action.setEnabled(False)
+        self.btn_later.setEnabled(True)
 
-    def _on_fetch_error(self, error_msg):
-        self.progress.hide()
-        self.lbl_title.setText("❌ " + self.get_text("msg_update_error", "Falha na comunicação com o servidor."))
-        self.changelog_box.setText(f"Detalhes técnicos:\n{error_msg}")
-        self.btn_update.setEnabled(False)
+    # ------------------------------------------------------------ descarga
+    def _start_download(self) -> None:
+        if not self.release:
+            return
 
-    def _start_download(self):
-        import platform
-        import webbrowser
-        
+        # No macOS o Gatekeeper rejeita um DMG substituído por baixo; abrir a
+        # página da release é o caminho que não deixa o utilizador preso.
         if platform.system() == "Darwin":
-            release_url = self.release_data.get("html_url", "https://github.com/dfdevx2/ZarManager/releases/latest")
-            webbrowser.open(release_url)
+            webbrowser.open(self.release.get("html_url", RELEASE_PAGE))
             self.accept()
             return
-            
-        url, ext = UpdaterService.get_asset_url(self.release_data)
-        
+
+        url, extension = UpdaterService.get_asset_url(self.release)
         if not url:
-            self.changelog_box.setText("❌ Nenhum binário compatível com o seu Sistema Operativo foi encontrado nas Releases do GitHub.")
+            self.changelog.setPlainText(self.t("upd_no_asset"))
             return
 
-        self.btn_update.setEnabled(False)
+        asset_name = url.rsplit("/", 1)[-1]
+        checksum = UpdaterService.get_checksum(self.release, asset_name)
+
+        self.btn_action.setEnabled(False)
         self.btn_later.setEnabled(False)
         self.progress.show()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
-        
-        self.lbl_title.setText("A transferir a nova versão...")
-        self.btn_update.setText("Transferindo...")
+        self.lbl_title.setText(self.t("upd_downloading"))
 
-        temp_dir = Path(tempfile.gettempdir())
-        dest_path = temp_dir / f"ZarManager_Update{ext}"
+        destination = Path(tempfile.gettempdir()) / f"ZarManager_Update{extension}"
+        self.download = DownloadThread(url, str(destination), checksum)
+        self.download.progress_signal.connect(self.progress.setValue)
+        self.download.error_signal.connect(self._on_error)
+        self.download.finished_signal.connect(self._apply)
+        self.download.start()
 
-        self.dl_thread = DownloadThread(url, str(dest_path))
-        self.dl_thread.progress_signal.connect(self.progress.setValue)
-        self.dl_thread.error_signal.connect(self._on_fetch_error)
-        self.dl_thread.finished_signal.connect(self._on_download_finished)
-        self.dl_thread.start()
-
-    def _on_download_finished(self, downloaded_path: str):
-        self.lbl_title.setText("✅ Transferência Concluída! A reiniciar...")
+    def _apply(self, path: str) -> None:
+        self.lbl_title.setText(self.t("upd_restart"))
         self.progress.setValue(100)
-        UpdaterService.apply_update_and_restart(downloaded_path)
+        UpdaterService.apply_update_and_restart(path)
+
+    def reject(self) -> None:
+        if self.download is not None and self.download.isRunning():
+            self.download.cancel()
+            self.download.wait(2000)
+        super().reject()

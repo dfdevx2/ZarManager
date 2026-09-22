@@ -1,261 +1,503 @@
-TRANSLATIONS = {
+"""Traduções.
+
+O core emite chaves e argumentos (ver core/events.py) e é aqui que se
+transformam em texto. Isto substitui o bloco de `msg.replace(...)` que existia
+no emit_log e que traduzia mensagens já formatadas, frase a frase.
+"""
+
+from __future__ import annotations
+
+TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt-br": {
-        # === TÍTULOS E ABAS ===
+        # ---------------------------------------------------------- navegação
         "app_title": "ZarManager",
-        "tab_auto": "Modo Automatizado (Universal)",
-        "tab_extract_arc": "Extrair Arquivos (7z)",
-        "tab_extract": "Apenas Extrair ISO",
-        "tab_compress": "Apenas Comprimir",
-        "tab_settings": "Configurações",
-        "tab_about": "Sobre",
-        
-        # === TELA DE BOAS-VINDAS & TUTORIAL ===
-        "msg_welcome": "Bem-vindo",
-        "msg_choose_theme": "Escolha o tema visual inicial:",
-        "btn_continue": "Continuar",
-        "tut_title": "Guia Rápido & Avisos de Segurança 🚀",
-        "tut_msg": "Bem-vindo ao ZarManager!\n\nPara começar, escolha o modo de operação nas abas superiores.\n1. Selecione a sua pasta de Origem (onde estão os seus ficheiros) e a de Destino.\n2. Marque os itens na lista que deseja processar.\n3. Pressione 'Iniciar Processamento'!\n\n🛡️ AVISO IMPORTANTE (WINDOWS):\nComo a ferramenta é um executável único, ela extrai os motores de compressão para a pasta temporária do sistema durante o uso. Antivírus (como o Windows Defender) podem apagar estes ficheiros silenciosamente por falso positivo, causando um [ERRO CRÍTICO] de ficheiros ausentes ao iniciar o processamento.\nPara evitar isto, adicione o ficheiro '.exe' do ZarManager à lista de Exclusões do seu Antivírus.\n\n💡 DICA DE OURO: Se tiver dúvidas sobre o que um botão faz, deixe o rato parado sobre ele durante 2 segundos e uma bolha explicativa irá aparecer.",
-        
-        # === INTERFACE PRINCIPAL ===
-        "lbl_directories": "Diretórios",
-        "lbl_source": "Diretório de Origem:",
-        "lbl_target": "Diretório de Destino:",
-        "lbl_search_source": "Procurar Origem...",
-        "lbl_search_target": "Procurar Destino...",
-        "lbl_selectable_items": "Itens Selecionáveis:",
-        "btn_invert_sel": "Inverter Seleção",
-        "msg_no_files": "Nenhum ficheiro compatível encontrado na pasta.",
-        "lbl_console": "Console de Registo",
-        
-        # === BOTÕES DE CONTROLO ===
-        "btn_start_proc": "▶ Iniciar Processamento",
-        "btn_pause_proc": "⏸ Pausar Fila",
-        "btn_resume_proc": "▶ Retomar Fila",
-        "btn_cancel_proc": "⏹ Cancelar Operação",
-        "lbl_processed": "processados",
-        
-        # === CONFIGURAÇÕES ===
-        "lbl_language": "Idioma da Interface",
-        "lbl_theme": "Tema Visual",
-        "theme_system": "Sistema",
-        "theme_black": "Preto",
-        "theme_white": "Branco",
-        "lbl_workers": "Threads de Processamento",
-        "worker_warning": "Aviso de Performance: Alocar uma quantidade excessiva de threads pode causar sobrecarga severa no disco (I/O Bottleneck), resultando em perda dramática de velocidade. O ideal é manter um valor moderado (2 a 4) para discos rígidos.",
-        
-        # === SOBRE & TROUBLESHOOTING ===
-        "about_title": "Sobre o ZarManager",
-        "about_desc": "Uma ferramenta gráfica multiplataforma para extração e compressão de arquivos XISO.",
-        "lbl_about_dev": "Desenvolvedor",
-        "btn_repo": "🌐 Repositório Oficial no GitHub",
-        "btn_kofi": "☕ Apoiar o Projeto no Ko-fi",
-        "btn_troubleshoot": "🛠️ Resolução de Erros Comuns",
-        "lbl_how_to_use": "Como Usar",
-        "about_tutorial": "Instruções:\n1. Selecione o modo de operação na aba superior.\n2. Defina os diretórios de origem e destino.\n3. Selecione os arquivos e inicie o lote.",
-        "lbl_auto_update": "Verificar atualizações automaticamente ao iniciar",
-        "btn_check_update": "Verificar Atualizações",
-        "btn_download_update": "Baixar Nova Versão",
-        
-        "diag_troubleshoot_title": "🛠️ Erros Comuns e Soluções",
-        "diag_troubleshoot_msg": "Aqui estão as soluções rápidas para os problemas mais comuns por sistema operativo:\n\n🪟 WINDOWS\nErro: O processamento falha imediatamente ([CRITICAL ERROR] Motores ausentes).\nCausa: O Windows Defender ou Antivírus apagou os motores da pasta temporária por falso positivo.\nSolução: Adicione o executável do ZarManager à lista de Exclusões do seu Antivírus.\n\n🍏 MACOS\nErro: 'A aplicação está danificada e não pode ser aberta'.\nCausa: O Gatekeeper da Apple bloqueou o ficheiro (Quarentena).\nSolução: Abra o 'Terminal' do Mac e digite o seguinte comando (ajuste o caminho se necessário): xattr -cr /Applications/ZarManager.app\n\n🐧 LINUX\nErro: A AppImage não abre de todo ou não processa nada.\nCausa: Faltam permissões de execução ou a biblioteca FUSE.\nSolução: Clique com o botão direito na AppImage -> Propriedades -> Ative 'Permitir execução do ficheiro como programa'. Certifique-se também de que tem o pacote 'libfuse2' instalado no seu sistema.",
-        
-        # === SISTEMA E ATUALIZAÇÕES ===
-        "log_ready": "Sistema pronto para operação. Listagem otimizada nativa ativa.",
-        "log_lang_changed": "Idioma da interface alterado com sucesso.",
-        "msg_checking_update": "Consultando os servidores do GitHub...",
-        "msg_update_avail": "Nova versão ({}) disponível!",
-        "msg_update_latest": "O sistema está atualizado (Versão {}).",
-        "msg_update_error": "Falha na comunicação com o servidor.",
-        "msg_update_popup_title": "Nova Versão Disponível",
-        "msg_update_popup_desc": "A versão {} do ZarManager foi lançada!\n\nDeseja abrir o navegador para baixar a atualização agora?",
-        
-        # === DIÁLOGOS DE CONFLITO E EXCLUSÃO ===
-        "msg_collision_title": "Conflito de Arquivos",
-        "msg_collision_desc": "Alguns itens selecionados ou pastas intermédias já existem no destino. O que deseja fazer?\n\n• Sobrescrever: Substitui os ficheiros existentes.\n• Pular Existentes: Ignora e processa apenas os novos.\n• Renomear Auto: Adiciona (_1) para evitar conflitos.\n• Cancelar: Aborta a operação.",
-        "msg_queue_empty": "Todos os itens conflitantes foram pulados. A fila está vazia.",
+        "nav_auto": "Automático",
+        "nav_arc": "Arquivos",
+        "nav_iso": "ISO",
+        "nav_zar": "Comprimir",
+        "nav_settings": "Configurações",
+        "nav_about": "Sobre",
+        "nav_help": "Ajuda",
+        "tip_auto": "Detecta o formato e encadeia as etapas sozinho.",
+        "tip_extract_arc": "Só extrai ZIP, RAR e 7z.",
+        "tip_extract": "Só extrai imagens de disco.",
+        "tip_compress": "Só comprime pastas para .zar.",
+
+        # ------------------------------------------------------ boas-vindas
+        "welcome_hero": "ZarManager",
+        "welcome_sub": "Extraia, converta e comprima a sua biblioteca sem sair do lugar.",
+        "welcome_lang_title": "Em que idioma prefere trabalhar?",
+        "welcome_lang_desc": "Pode mudar isto a qualquer momento nas configurações.",
+        "welcome_theme_title": "Escolha o visual",
+        "welcome_theme_desc": "Clique num cartão para ver o tema aplicado na hora.",
+        "welcome_dirs_title": "Onde estão os seus ficheiros?",
+        "welcome_dirs_desc": "Opcional agora — dá para definir depois na tela principal.",
+        "welcome_step": "Passo {current} de {total}",
+        "btn_back": "Voltar",
+        "btn_next": "Continuar",
+        "btn_start_using": "Começar a usar",
+        "btn_skip": "Saltar",
+
+        # -------------------------------------------------------- workspace
+        "lbl_source": "Origem",
+        "lbl_target": "Destino",
+        "btn_browse": "Procurar…",
+        "btn_refresh": "Atualizar lista",
+        "lbl_items": "Itens encontrados",
+        "btn_invert": "Inverter seleção",
+        "msg_no_files": "Nenhum ficheiro compatível nesta pasta.",
+        "msg_no_source": "Escolha uma pasta de origem para começar.",
+        "lbl_selected": "{checked} de {total} selecionados",
+        "btn_start": "Iniciar",
+        "btn_pause": "Pausar",
+        "btn_resume": "Retomar",
         "btn_cancel": "Cancelar",
-        "btn_skip_existing": "Pular Existentes",
-        "btn_overwrite": "Sobrescrever",
-        "btn_rename": "Renomear Auto (_1)",
-        
-        "delete_title": "Manter Arquivos Originais?",
-        "delete_msg": "Por padrão, a ferramenta deleta os arquivos de origem (ISOs, ZIPs, Pastas) após o sucesso da operação para economizar espaço no disco.\n\nDeseja MANTER os arquivos originais?\n\n• Manter Originais: Mantém a origem e o arquivo gerado.\n• Apagar (Padrão): Exclui a origem após gerar o arquivo.",
-        "btn_delete_default": "Apagar (Padrão)",
-        "btn_keep_originals": "Manter Originais",
+        "lbl_console": "Registo",
+        "btn_clear_console": "Limpar",
+        "lbl_progress": "{done} de {total} processados",
 
-        # === DIÁLOGO DE ENCERRAMENTO (ANTI-GHOSTING) ===
-        "warn_exit_title": "Aviso de Encerramento",
-        "warn_exit_msg": "Existem processos ativos em segundo plano.\nSe fechar agora, o programa irá cancelar e abortar tudo de forma segura.\n\nDeseja mesmo sair?",
-        "btn_exit_yes": "Sair e Abortar",
-        "btn_exit_no": "Cancelar e Voltar",
+        # ------------------------------------------------------------ etapas
+        "stage_archive": "A extrair arquivo",
+        "stage_xiso": "A extrair imagem",
+        "stage_stfs": "A extrair pacote Xbox 360",
+        "stage_god": "A reconstruir a imagem (GOD)",
+        "stage_zar": "A comprimir (.zar)",
+        "stage_rvz": "A converter (.rvz)",
+        "stage_chd": "A converter (.chd)",
+        "stage_pkg": "A extrair pacote",
 
-        # === VERIFICAÇÃO AMBIENTAL INTELIGENTE ===
-        "log_env_ok": "[SISTEMA] Verificação concluída. Todos os motores embutidos estão operacionais e no local correto.",
-        "err_title_win": "Erro Crítico: Ferramentas Bloqueadas (Antivírus)",
-        "err_msg_win": "O ZarManager não conseguiu aceder aos seguintes motores embutidos:\n\n{0}\n\nNo Windows, isto ocorre quase sempre porque o Windows Defender (ou outro Antivírus) apagou os ficheiros silenciosamente da pasta temporária por 'falso positivo'.\n\nSOLUÇÃO:\n1. Adicione o ficheiro ZarManager.exe à lista de 'Exclusões' do seu Antivírus.\n2. Reinicie o ZarManager e tente novamente.",
-        "err_title_mac": "Erro Crítico: Ficheiros Ausentes",
-        "err_msg_mac": "O ZarManager não conseguiu aceder aos seguintes motores embutidos:\n\n{0}\n\nNo macOS, isto pode ocorrer se o pacote (.dmg) não foi montado corretamente ou se as permissões de extração foram bloqueadas.\n\nSOLUÇÃO:\n1. Certifique-se de ter arrastado o ZarManager para a pasta 'Aplicações' antes de abrir.\n2. Verifique se o sistema não bloqueou a execução nas 'Definições de Sistema > Privacidade e Segurança'.",
-        "err_title_lin": "Erro Crítico: Permissões de Ficheiro",
-        "err_msg_lin": "O ZarManager não conseguiu aceder aos seguintes motores embutidos:\n\n{0}\n\nNo Linux, isto geralmente é causado por falta de permissões na extração da AppImage ou falta do pacote FUSE.\n\nSOLUÇÃO:\n1. Clique com o botão direito no ficheiro .AppImage, vá a 'Propriedades' e ative 'Permitir execução do ficheiro como um programa'.\n2. Confirme que tem o pacote 'libfuse2' instalado no seu sistema.",
-        
-        # --- ALERTA CIRÚRGICO DE ANTIVÍRUS (NOVO) ---
-        "av_alert_title": "Alerta Crítico de Segurança",
-        "av_alert_msg": "O Windows Defender (ou o seu Antivírus) acabou de eliminar o ficheiro '{0}' da memória em tempo real.\n\nIsto é um 'Falso Positivo' comum. Para o ZarManager funcionar, por favor:\n1. Vá ao Histórico de Proteção do Windows Defender.\n2. Permita/Restaure a ameaça bloqueada.\n3. Adicione a pasta do ZarManager às Exclusões do seu Antivírus.",
-        "log_av_block": "[BLOQUEIO] O Antivírus destruiu o motor: {0}",
+        # ------------------------------------------------------------ estados
+        "state_queued": "Na fila",
+        "state_running": "A processar",
+        "state_done": "Concluído",
+        "state_failed": "Falhou",
+        "state_skipped": "Ignorado",
+        "state_cancelled": "Cancelado",
 
-        # === STATUS DO PROCESSAMENTO ===
-        "log_extracting_iso": "EXTRAINDO ISO",
-        "log_extracting_arc": "DESCOMPACTANDO",
-        "log_compressing": "COMPRIMINDO ZAR",
-        "log_completed": "CONCLUÍDO",
-        "log_failed": "FALHA",
-        "log_cancelled": "CANCELADO",
-        "log_skipped": "PULADO",
+        # ----------------------------------------------------------- formatos
+        "fmt_archive": "Arquivo comprimido",
+        "fmt_game_dir": "Pasta de jogo",
+        "fmt_xiso": "Imagem Xbox (XDVDFS)",
+        "fmt_stfs": "Pacote Xbox 360 (XBLA/DLC)",
+        "fmt_god": "Games on Demand",
+        "fmt_gc_iso": "GameCube",
+        "fmt_wii_iso": "Wii",
+        "fmt_iso9660": "Imagem ISO9660",
+        "fmt_cd_image": "Imagem de CD",
+        "fmt_pkg_ps3": "Pacote PS3",
+        "fmt_pkg_ps4": "Pacote PS4",
+        "fmt_zar": "ZArchive",
+        "fmt_rvz": "RVZ",
+        "fmt_chd": "CHD",
+        "fmt_unknown": "Formato desconhecido",
 
-        # === DICAS / TOOLTIPS ===
-        "tip_auto": "Ciclo Inteligente: Lê ZIPs, ISOs ou Pastas. Faz a esteira completa até ao formato .zar e limpa resíduos.",
-        "tip_extract_arc": "Modo Isolado: Extrai .zip, .rar ou .7z de forma limpa.",
-        "tip_extract": "Modo Isolado: Extrai os arquivos internos da ISO (XDVDFS) para uma pasta.",
-        "tip_compress": "Modo Isolado: Compacta uma pasta já extraída para o formato .zar.",
-        "tip_source": "Clique para escolher a pasta onde estão os ficheiros que deseja processar.",
-        "tip_target": "Clique para escolher a pasta onde os ficheiros prontos devem ser guardados.",
-        "tip_invert": "Inverte a seleção atual dos itens na lista acima.",
-        "tip_start": "Inicia o processamento da fila com base nos itens marcados.",
-        "tip_pause": "Congela o processamento atual. Pode retomar a qualquer altura.",
-        "tip_cancel": "Cancela a fila e limpa os ficheiros incompletos de forma segura.",
-        "tip_theme": "Altera o esquema de cores. Pode exigir reiniciar o programa para aplicar paletas nativas.",
-        "tip_lang": "Muda a linguagem da interface e dos logs em tempo real."
+        # ------------------------------------------------------------ eventos
+        "ev_job_start": "A iniciar: {count} item(ns) em modo {mode}.",
+        "ev_env_ok": "Ambiente verificado. Motores operacionais.",
+        "ev_engine_missing": "Motores em falta: {engines}",
+        "ev_engine_optional_missing": "Motores opcionais ausentes: {engines}. Esses formatos vão ser ignorados.",
+        "ev_item_start": "{name}: detectado como {fmt}.",
+        "ev_item_done": "{name} → {output}",
+        "ev_item_failed": "{name}: {error}",
+        "ev_item_unknown": "{name}: formato não reconhecido, ignorado.",
+        "ev_item_no_route": "{name} ({fmt}): sem motor para este formato ({engines}).",
+        "ev_item_nothing_to_do": "{name}: já está no formato final.",
+        "ev_item_skip_exists": "{name}: já existe no destino, ignorado.",
+        "ev_collision_rename": "Conflito evitado: gravado como {name}.",
+        "ev_collision_overwrite": "Substituído: {name}",
+        "ev_original_removed": "Original removido: {name}",
+        "ev_original_remove_failed": "Não foi possível remover {name}: {error}",
+        "ev_target_is_item": "{name} é o próprio diretório de destino e foi ignorado.",
+        "ev_cancel_requested": "Cancelamento pedido. A interromper os motores…",
+        "ev_paused": "Em pausa.",
+        "ev_resumed": "Retomado.",
+        "ev_job_done": "Terminado: {completed} concluído(s), {failed} falha(s), {skipped} ignorado(s).",
+        "ev_job_cancelled": "Lote cancelado pelo utilizador.",
+
+        # ------------------------------------------------------------- erros
+        "err_generic": "Erro inesperado.",
+        "err_engine_missing": "O motor {engine} não está disponível.",
+        "err_engine_failed": "O motor {engine} terminou com código {code}.",
+        "err_elevation_required": "O Windows bloqueou o motor {engine} por falta de privilégios.",
+        "err_cancelled": "Operação cancelada.",
+        "err_no_route": "Não há como converter {source} em {target}.",
+
+        # ------------------------------------------------------- configurações
+        "set_title": "Configurações",
+        "set_appearance": "Aparência",
+        "set_language": "Idioma",
+        "set_theme": "Tema",
+        "set_motion": "Reduzir animações",
+        "set_motion_hint": "Desliga o salto das pílulas e as transições.",
+        "set_audio": "Som",
+        "set_sfx": "Efeitos sonoros",
+        "set_volume": "Volume",
+        "set_test_sound": "Testar",
+        "set_performance": "Desempenho",
+        "set_workers": "Tarefas em paralelo: {value}",
+        "set_workers_hint": "Mais tarefas não significa mais rápido: extrair e comprimir saturam o disco. Entre 2 e 4 costuma ser o ponto ideal.",
+        "set_files": "Ficheiros",
+        "set_keep_originals": "Manter os originais depois de processar",
+        "set_collision": "Quando já existe no destino",
+        "collision_ask": "Perguntar",
+        "collision_skip": "Ignorar",
+        "collision_overwrite": "Substituir",
+        "collision_rename": "Renomear (_1)",
+        "set_updates": "Atualizações",
+        "set_auto_update": "Procurar atualizações ao arrancar",
+
+        # ------------------------------------------------------------- sobre
+        "about_title": "Sobre",
+        "about_tagline": "Gestor de extração e compressão para bibliotecas de jogos.",
+        "about_version": "Versão",
+        "about_dev": "Desenvolvimento",
+        "about_license": "Licença",
+        "about_platform": "Plataforma",
+        "about_engines": "Motores incluídos",
+        "about_engines_desc": "Cada motor é um programa separado, com a sua própria licença.",
+        "about_updated": "Está atualizado",
+        "about_update_available": "Há uma versão nova",
+        "btn_repo": "Repositório no GitHub",
+        "btn_kofi": "Apoiar no Ko-fi",
+        "btn_check_update": "Procurar atualizações",
+        "btn_troubleshoot": "Resolução de problemas",
+
+        # --------------------------------------------------- troubleshooting
+        "ts_title": "Resolução de problemas",
+        "ts_sub": "Primeiro o que costuma resolver no seu sistema; o resto fica recolhido.",
+        "ts_engines": "Estado dos motores",
+        "ts_engines_desc": "Se algum aparecer com ✗, o antivírus provavelmente apagou o ficheiro.",
+        "btn_check_engines": "Verificar motores",
+        "btn_copy_diag": "Copiar diagnóstico",
+        "btn_open_logs": "Abrir pasta de registos",
+        "btn_copy_command": "Copiar comando",
+        "ts_copied": "Copiado.",
+        "ts_engine_native": "Integrado na aplicação",
+        "ts_win_title": "Windows: o antivírus apaga os motores",
+        "ts_win_body": (
+            "O ZarManager é distribuído como pasta portátil. O executável e a pasta "
+            "'bin' têm de ficar juntos — mover o .exe para fora quebra o programa.\n\n"
+            "Se o Windows Defender apagar algo de dentro de 'bin', adicione a pasta "
+            "inteira às exclusões: Segurança do Windows → Proteção contra vírus → "
+            "Gerir definições → Adicionar exclusão → Pasta."
+        ),
+        "ts_lin_title": "Linux: a AppImage não abre",
+        "ts_lin_body": (
+            "Dê permissão de execução ao ficheiro e confirme que tem o FUSE instalado.\n"
+            "Se abrir e não encontrar os motores, verifique se a pasta 'bin' acompanha o binário."
+        ),
+        "ts_mac_title": "macOS: 'aplicação danificada'",
+        "ts_mac_body": (
+            "O Gatekeeper marca binários transferidos sem assinatura da Apple. "
+            "Retire a quarentena com o comando abaixo e volte a abrir."
+        ),
+        "ts_perf_title": "Está lento ou o disco satura",
+        "ts_perf_body": (
+            "Baixe as tarefas em paralelo nas configurações. Extrair e comprimir são "
+            "operações limitadas pelo disco, e correr oito ao mesmo tempo costuma ficar "
+            "mais lento do que correr duas."
+        ),
+
+        # ----------------------------------------------------------- diálogos
+        "dlg_collision_title": "Já existe no destino",
+        "dlg_collision_desc": "Alguns itens já têm resultado na pasta de destino. O que quer fazer?",
+        "btn_skip_existing": "Ignorar existentes",
+        "btn_overwrite": "Substituir",
+        "btn_rename": "Renomear (_1)",
+        "dlg_delete_title": "Apagar os originais?",
+        "dlg_delete_desc": "Os originais só são apagados depois de o resultado chegar ao destino.",
+        "btn_delete_originals": "Apagar depois de processar",
+        "btn_keep_originals": "Manter originais",
+        "dlg_done_title": "Concluído",
+        "dlg_done_desc": "{completed} item(ns) processado(s) sem erros.",
+        "dlg_partial_title": "Concluído com falhas",
+        "dlg_partial_desc": "{completed} concluído(s), {failed} com falha. Veja o registo.",
+        "dlg_failed_title": "Falhou",
+        "dlg_failed_desc": "Nenhum item foi concluído. Veja o registo para o motivo.",
+        "dlg_cancelled_title": "Cancelado",
+        "dlg_cancelled_desc": "O lote foi interrompido. Nada foi gravado no destino.",
+        "dlg_env_title": "Motores em falta",
+        "dlg_env_desc": "Faltam estes motores: {engines}\n\nVeja a Resolução de problemas.",
+        "av_alert_title": "Motor removido durante a execução",
+        "av_alert_msg": (
+            "O ficheiro {engine} desapareceu enquanto o ZarManager o usava. "
+            "Quase sempre isto é o antivírus a apagá-lo por falso positivo.\n\n"
+            "Os seus ficheiros originais não foram tocados."
+        ),
+        "warn_exit_title": "Há trabalho em curso",
+        "warn_exit_msg": "Sair agora cancela o que está a correr. Os originais ficam intactos.",
+        "btn_exit_yes": "Sair e cancelar",
+        "btn_exit_no": "Continuar a trabalhar",
+        "warn_same_dir": "A origem e o destino são a mesma pasta.",
+        "warn_target_inside_source": "O destino está dentro da origem. Funciona, mas os resultados vão aparecer na lista de entrada.",
+        "msg_err_target": "Defina a pasta de destino.",
+        "msg_err_select": "Selecione pelo menos um item.",
+        "msg_err_running": "Já existe um processamento a decorrer.",
+
+        # ------------------------------------------------------ atualizações
+        "upd_title": "Atualização",
+        "upd_checking": "A procurar atualizações…",
+        "upd_available": "Versão {version} disponível",
+        "upd_latest": "Está na versão mais recente ({version})",
+        "upd_error": "Não foi possível falar com o servidor",
+        "upd_downloading": "A transferir…",
+        "upd_installed": "Versão instalada: {version}",
+        "upd_no_asset": "Não há binário para o seu sistema nesta release.",
+        "upd_checksum_failed": "O ficheiro transferido não corresponde ao checksum publicado. Atualização abortada.",
+        "upd_restart": "Transferência concluída. A reiniciar…",
+        "btn_download_update": "Atualizar agora",
+        "btn_later": "Mais tarde",
+        "btn_close": "Fechar",
     },
+
     "en": {
-        # === TITLES AND TABS ===
         "app_title": "ZarManager",
-        "tab_auto": "Automated Pipeline (Universal)",
-        "tab_extract_arc": "Extract Archives (7z)",
-        "tab_extract": "Extract ISO Only",
-        "tab_compress": "Compress Only",
-        "tab_settings": "Settings",
-        "tab_about": "About",
-        
-        # === WELCOME SCREEN & TUTORIAL ===
-        "msg_welcome": "Welcome",
-        "msg_choose_theme": "Choose your initial visual theme:",
-        "btn_continue": "Continue",
-        "tut_title": "Quick Start Guide & Warnings 🚀",
-        "tut_msg": "Welcome to ZarManager!\n\nTo get started, pick an operation mode from the top tabs.\n1. Select your Source folder (where your files are) and your Target folder.\n2. Check the items you want to process in the list.\n3. Click 'Start Processing'!\n\n🛡️ IMPORTANT WARNING (WINDOWS):\nBecause the tool is a single-file executable, it extracts its background engines to your system's temp folder at runtime. Antivirus software (like Windows Defender) may falsely flag and silently delete these files, causing a [CRITICAL ERROR] for missing binaries.\nTo prevent this, please add the ZarManager '.exe' file to your Antivirus Exclusions list.\n\n💡 PRO TIP: If you're ever unsure about what a button does, leave your mouse over it for 2 seconds and a beautiful tooltip will appear.",
-        
-        # === MAIN INTERFACE ===
-        "lbl_directories": "Directories",
-        "lbl_source": "Source Directory:",
-        "lbl_target": "Target Directory:",
-        "lbl_search_source": "Browse Source...",
-        "lbl_search_target": "Browse Target...",
-        "lbl_selectable_items": "Selectable Items:",
-        "btn_invert_sel": "Invert Selection",
-        "msg_no_files": "No compatible files found in this folder.",
-        "lbl_console": "Log Console",
-        
-        # === CONTROL BUTTONS ===
-        "btn_start_proc": "▶ Start Processing",
-        "btn_pause_proc": "⏸ Pause Queue",
-        "btn_resume_proc": "▶ Resume Queue",
-        "btn_cancel_proc": "⏹ Cancel Operation",
-        "lbl_processed": "processed",
-        
-        # === SETTINGS ===
-        "lbl_language": "Interface Language",
-        "lbl_theme": "Visual Theme",
-        "theme_system": "System",
-        "theme_black": "Pitch Black",
-        "theme_white": "White",
-        "lbl_workers": "Processing Threads",
-        "worker_warning": "Performance Warning: Allocating an excessive number of threads can cause severe disk overload (I/O Bottleneck), resulting in a dramatic loss of speed. It is ideal to keep a moderate value (2 to 4) for hard drives.",
-        
-        # === ABOUT & TROUBLESHOOTING ===
-        "about_title": "About ZarManager",
-        "about_desc": "A cross-platform GUI tool for XISO extraction and compression.",
-        "lbl_about_dev": "Developer",
-        "btn_repo": "🌐 Official GitHub Repository",
-        "btn_kofi": "☕ Support the Project on Ko-fi",
-        "btn_troubleshoot": "🛠️ Common Errors & Troubleshooting",
-        "lbl_how_to_use": "How to Use",
-        "about_tutorial": "Instructions:\n1. Select the operation mode on the top tab.\n2. Set the source and target directories.\n3. Select the files and start the batch processing.",
-        "lbl_auto_update": "Check for updates automatically on startup",
-        "btn_check_update": "Check for Updates",
-        "btn_download_update": "Download New Version",
-        
-        "diag_troubleshoot_title": "🛠️ Troubleshooting & Fixes",
-        "diag_troubleshoot_msg": "Here are the quick solutions for the most common issues across operating systems:\n\n🪟 WINDOWS\nError: Processing fails instantly ([CRITICAL ERROR] Missing Engines).\nCause: Windows Defender or Antivirus deleted the background engines from the temp folder as a false positive.\nSolution: Add the ZarManager executable to your Antivirus 'Exclusions' list.\n\n🍏 MACOS\nError: 'App is damaged and can't be opened'.\nCause: Apple's Gatekeeper blocked the file (Quarantine attribute).\nSolution: Open the Mac 'Terminal' and type the following command (adjust the path if needed): xattr -cr /Applications/ZarManager.app\n\n🐧 LINUX\nError: The AppImage won't open at all or doesn't process files.\nCause: Missing execution permissions or missing FUSE library.\nSolution: Right-click the AppImage -> Properties -> Enable 'Allow executing file as program'. Also, ensure you have the 'libfuse2' package installed on your system.",
-        
-        # === SYSTEM AND UPDATES ===
-        "log_ready": "System ready for operation. Optimized native listing active.",
-        "log_lang_changed": "Interface language changed successfully.",
-        "msg_checking_update": "Querying GitHub servers...",
-        "msg_update_avail": "New version ({}) available!",
-        "msg_update_latest": "System is up to date (Version {}).",
-        "msg_update_error": "Failed to communicate with the server.",
-        "msg_update_popup_title": "New Version Available",
-        "msg_update_popup_desc": "Version {} of ZarManager has been released!\n\nDo you want to open your browser to download the update now?",
-        
-        # === COLLISION AND DELETION DIALOGS ===
-        "msg_collision_title": "File Collision",
-        "msg_collision_desc": "Some selected items or intermediate folders already exist in the target directory. What do you want to do?\n\n• Overwrite: Replaces existing files.\n• Skip Existing: Ignores duplicates and processes only new ones.\n• Auto Rename: Appends (_1) to avoid conflicts.\n• Cancel: Abort the operation.",
-        "msg_queue_empty": "All conflicting items were skipped. The queue is empty.",
+        "nav_auto": "Automatic",
+        "nav_arc": "Archives",
+        "nav_iso": "ISO",
+        "nav_zar": "Compress",
+        "nav_settings": "Settings",
+        "nav_about": "About",
+        "nav_help": "Help",
+        "tip_auto": "Detects the format and chains the steps for you.",
+        "tip_extract_arc": "Extracts ZIP, RAR and 7z only.",
+        "tip_extract": "Extracts disc images only.",
+        "tip_compress": "Compresses folders to .zar only.",
+
+        "welcome_hero": "ZarManager",
+        "welcome_sub": "Extract, convert and compress your library without leaving the app.",
+        "welcome_lang_title": "Which language do you prefer?",
+        "welcome_lang_desc": "You can change this any time in settings.",
+        "welcome_theme_title": "Pick a look",
+        "welcome_theme_desc": "Click a card to apply the theme right away.",
+        "welcome_dirs_title": "Where are your files?",
+        "welcome_dirs_desc": "Optional for now — you can set these on the main screen.",
+        "welcome_step": "Step {current} of {total}",
+        "btn_back": "Back",
+        "btn_next": "Continue",
+        "btn_start_using": "Get started",
+        "btn_skip": "Skip",
+
+        "lbl_source": "Source",
+        "lbl_target": "Destination",
+        "btn_browse": "Browse…",
+        "btn_refresh": "Refresh list",
+        "lbl_items": "Items found",
+        "btn_invert": "Invert selection",
+        "msg_no_files": "No compatible files in this folder.",
+        "msg_no_source": "Pick a source folder to get started.",
+        "lbl_selected": "{checked} of {total} selected",
+        "btn_start": "Start",
+        "btn_pause": "Pause",
+        "btn_resume": "Resume",
         "btn_cancel": "Cancel",
-        "btn_skip_existing": "Skip Existing",
-        "btn_overwrite": "Overwrite",
-        "btn_rename": "Auto Rename (_1)",
-        
-        "delete_title": "Keep Original Files?",
-        "delete_msg": "By default, the tool deletes source files (ISOs, ZIPs, Folders) after a successful operation to save disk space.\n\nDo you want to KEEP the original files?\n\n• Keep Originals: Keeps both the source and the generated file.\n• Delete (Default): Deletes the source after generation.",
-        "btn_delete_default": "Delete (Default)",
-        "btn_keep_originals": "Keep Originals",
+        "lbl_console": "Log",
+        "btn_clear_console": "Clear",
+        "lbl_progress": "{done} of {total} processed",
 
-        # === EXIT DIALOG (ANTI-GHOSTING) ===
-        "warn_exit_title": "Exit Warning",
-        "warn_exit_msg": "There are active background processes running.\nIf you exit now, the program will safely cancel and abort everything.\n\nDo you really want to exit?",
-        "btn_exit_yes": "Exit and Abort",
-        "btn_exit_no": "Cancel and Return",
+        "stage_archive": "Extracting archive",
+        "stage_xiso": "Extracting image",
+        "stage_stfs": "Extracting Xbox 360 package",
+        "stage_god": "Rebuilding image (GOD)",
+        "stage_zar": "Compressing (.zar)",
+        "stage_rvz": "Converting (.rvz)",
+        "stage_chd": "Converting (.chd)",
+        "stage_pkg": "Extracting package",
 
-        # === VERIFICAÇÃO AMBIENTAL INTELIGENTE ===
-        "log_env_ok": "[SYSTEM] Verification complete. All embedded engines are in place and operational.",
-        "err_title_win": "Critical Error: Tools Blocked (Antivirus)",
-        "err_msg_win": "ZarManager could not access the following embedded engines:\n\n{0}\n\nOn Windows, this almost always happens because Windows Defender (or another Antivirus) silently deleted the files from the temp folder as a 'false positive'.\n\nSOLUTION:\n1. Add the ZarManager.exe file to your Antivirus 'Exclusions' list.\n2. Restart ZarManager and try again.",
-        "err_title_mac": "Critical Error: Missing Files",
-        "err_msg_mac": "ZarManager could not access the following embedded engines:\n\n{0}\n\nOn macOS, this can happen if the App Bundle was not mounted properly or extraction permissions were blocked.\n\nSOLUTION:\n1. Make sure you drag ZarManager to your 'Applications' folder before opening it.\n2. Check if your system blocked the execution under 'System Settings > Privacy & Security'.",
-        "err_title_lin": "Critical Error: File Permissions",
-        "err_msg_lin": "ZarManager could not access the following embedded engines:\n\n{0}\n\nOn Linux, this is usually caused by missing permissions to extract the AppImage or a missing FUSE package.\n\nSOLUTION:\n1. Right-click the .AppImage file, go to 'Properties' and enable 'Allow executing file as program'.\n2. Ensure you have the 'libfuse2' package installed on your system.",
-        
-        # --- ALERTA CIRÚRGICO DE ANTIVÍRUS (NOVO) ---
-        "av_alert_title": "Critical Security Alert",
-        "av_alert_msg": "Windows Defender (or your Antivirus) just deleted the file '{0}' from memory in real time.\n\nThis is a common 'False Positive'. For ZarManager to work, please:\n1. Go to Windows Defender Protection History.\n2. Allow/Restore the blocked threat.\n3. Add the ZarManager folder to your Antivirus Exclusions.",
-        "log_av_block": "[BLOCKED] Antivirus destroyed the engine: {0}",
+        "state_queued": "Queued",
+        "state_running": "Working",
+        "state_done": "Done",
+        "state_failed": "Failed",
+        "state_skipped": "Skipped",
+        "state_cancelled": "Cancelled",
 
-        # === STATUS DO PROCESSAMENTO ===
-        "log_extracting_iso": "EXTRACTING ISO",
-        "log_extracting_arc": "EXTRACTING ARCHIVE",
-        "log_compressing": "COMPRESSING ZAR",
-        "log_completed": "COMPLETED",
-        "log_failed": "FAILED",
-        "log_cancelled": "CANCELLED",
-        "log_skipped": "SKIPPED",
+        "fmt_archive": "Compressed archive",
+        "fmt_game_dir": "Game folder",
+        "fmt_xiso": "Xbox image (XDVDFS)",
+        "fmt_stfs": "Xbox 360 package (XBLA/DLC)",
+        "fmt_god": "Games on Demand",
+        "fmt_gc_iso": "GameCube",
+        "fmt_wii_iso": "Wii",
+        "fmt_iso9660": "ISO9660 image",
+        "fmt_cd_image": "CD image",
+        "fmt_pkg_ps3": "PS3 package",
+        "fmt_pkg_ps4": "PS4 package",
+        "fmt_zar": "ZArchive",
+        "fmt_rvz": "RVZ",
+        "fmt_chd": "CHD",
+        "fmt_unknown": "Unknown format",
 
-        # === TIPS / TOOLTIPS ===
-        "tip_auto": "Smart Cycle: Reads ZIPs, ISOs, or Folders. Runs full pipeline to .zar format.",
-        "tip_extract_arc": "Isolated Mode: Extracts archives flatly (no nested folders).",
-        "tip_extract": "Isolated Mode: Extracts ISO files (XDVDFS) to a folder.",
-        "tip_compress": "Isolated Mode: Compresses an extracted folder to .zar format.",
-        "tip_source": "Click to select the folder where your original files are located.",
-        "tip_target": "Click to select the folder where the finished files should be saved.",
-        "tip_invert": "Quickly inverts the selection of items in the list above.",
-        "tip_start": "Starts processing the queue based on the checked items.",
-        "tip_pause": "Freezes the current processing. You can resume at any time.",
-        "tip_cancel": "Cancels the queue and safely deletes incomplete temporary files.",
-        "tip_theme": "Changes the visual theme. Some native palettes may require an app restart.",
-        "tip_lang": "Changes the interface and log language in real time."
-    }
+        "ev_job_start": "Starting: {count} item(s) in {mode} mode.",
+        "ev_env_ok": "Environment verified. Engines operational.",
+        "ev_engine_missing": "Missing engines: {engines}",
+        "ev_engine_optional_missing": "Optional engines missing: {engines}. Those formats will be skipped.",
+        "ev_item_start": "{name}: detected as {fmt}.",
+        "ev_item_done": "{name} → {output}",
+        "ev_item_failed": "{name}: {error}",
+        "ev_item_unknown": "{name}: format not recognised, skipped.",
+        "ev_item_no_route": "{name} ({fmt}): no engine for this format ({engines}).",
+        "ev_item_nothing_to_do": "{name}: already in its final format.",
+        "ev_item_skip_exists": "{name}: already in the destination, skipped.",
+        "ev_collision_rename": "Conflict avoided: saved as {name}.",
+        "ev_collision_overwrite": "Replaced: {name}",
+        "ev_original_removed": "Original removed: {name}",
+        "ev_original_remove_failed": "Could not remove {name}: {error}",
+        "ev_target_is_item": "{name} is the destination folder itself and was skipped.",
+        "ev_cancel_requested": "Cancellation requested. Stopping engines…",
+        "ev_paused": "Paused.",
+        "ev_resumed": "Resumed.",
+        "ev_job_done": "Finished: {completed} done, {failed} failed, {skipped} skipped.",
+        "ev_job_cancelled": "Batch cancelled by the user.",
+
+        "err_generic": "Unexpected error.",
+        "err_engine_missing": "Engine {engine} is not available.",
+        "err_engine_failed": "Engine {engine} exited with code {code}.",
+        "err_elevation_required": "Windows blocked engine {engine} for lack of privileges.",
+        "err_cancelled": "Operation cancelled.",
+        "err_no_route": "No way to convert {source} into {target}.",
+
+        "set_title": "Settings",
+        "set_appearance": "Appearance",
+        "set_language": "Language",
+        "set_theme": "Theme",
+        "set_motion": "Reduce motion",
+        "set_motion_hint": "Turns off the pill bounce and the transitions.",
+        "set_audio": "Sound",
+        "set_sfx": "Sound effects",
+        "set_volume": "Volume",
+        "set_test_sound": "Test",
+        "set_performance": "Performance",
+        "set_workers": "Parallel tasks: {value}",
+        "set_workers_hint": "More tasks is not faster: extracting and compressing saturate the disk. Two to four is usually the sweet spot.",
+        "set_files": "Files",
+        "set_keep_originals": "Keep originals after processing",
+        "set_collision": "When it already exists in the destination",
+        "collision_ask": "Ask",
+        "collision_skip": "Skip",
+        "collision_overwrite": "Replace",
+        "collision_rename": "Rename (_1)",
+        "set_updates": "Updates",
+        "set_auto_update": "Check for updates at startup",
+
+        "about_title": "About",
+        "about_tagline": "Extraction and compression manager for game libraries.",
+        "about_version": "Version",
+        "about_dev": "Development",
+        "about_license": "License",
+        "about_platform": "Platform",
+        "about_engines": "Bundled engines",
+        "about_engines_desc": "Each engine is a separate program with its own license.",
+        "about_updated": "Up to date",
+        "about_update_available": "A new version is available",
+        "btn_repo": "GitHub repository",
+        "btn_kofi": "Support on Ko-fi",
+        "btn_check_update": "Check for updates",
+        "btn_troubleshoot": "Troubleshooting",
+
+        "ts_title": "Troubleshooting",
+        "ts_sub": "What usually fixes it on your system first; the rest stays collapsed.",
+        "ts_engines": "Engine status",
+        "ts_engines_desc": "If any shows ✗, your antivirus has probably deleted the file.",
+        "btn_check_engines": "Check engines",
+        "btn_copy_diag": "Copy diagnostics",
+        "btn_open_logs": "Open log folder",
+        "btn_copy_command": "Copy command",
+        "ts_copied": "Copied.",
+        "ts_engine_native": "Built into the app",
+        "ts_win_title": "Windows: antivirus deletes the engines",
+        "ts_win_body": (
+            "ZarManager ships as a portable folder. The executable and the 'bin' folder "
+            "must stay together — moving the .exe out breaks the program.\n\n"
+            "If Windows Defender removes something from 'bin', exclude the whole folder: "
+            "Windows Security → Virus protection → Manage settings → Add exclusion → Folder."
+        ),
+        "ts_lin_title": "Linux: the AppImage won't open",
+        "ts_lin_body": (
+            "Make the file executable and confirm FUSE is installed.\n"
+            "If it opens but finds no engines, check that the 'bin' folder travels with the binary."
+        ),
+        "ts_mac_title": "macOS: \"app is damaged\"",
+        "ts_mac_body": (
+            "Gatekeeper flags downloaded binaries that Apple has not signed. "
+            "Clear the quarantine with the command below and open it again."
+        ),
+        "ts_perf_title": "It's slow or the disk is saturated",
+        "ts_perf_body": (
+            "Lower the parallel tasks in settings. Extracting and compressing are "
+            "disk-bound, and running eight at once is usually slower than running two."
+        ),
+
+        "dlg_collision_title": "Already in the destination",
+        "dlg_collision_desc": "Some items already have a result in the destination folder. What now?",
+        "btn_skip_existing": "Skip existing",
+        "btn_overwrite": "Replace",
+        "btn_rename": "Rename (_1)",
+        "dlg_delete_title": "Delete the originals?",
+        "dlg_delete_desc": "Originals are only deleted once the result reaches the destination.",
+        "btn_delete_originals": "Delete after processing",
+        "btn_keep_originals": "Keep originals",
+        "dlg_done_title": "Done",
+        "dlg_done_desc": "{completed} item(s) processed without errors.",
+        "dlg_partial_title": "Finished with failures",
+        "dlg_partial_desc": "{completed} done, {failed} failed. Check the log.",
+        "dlg_failed_title": "Failed",
+        "dlg_failed_desc": "No item completed. Check the log for the reason.",
+        "dlg_cancelled_title": "Cancelled",
+        "dlg_cancelled_desc": "The batch was interrupted. Nothing was written to the destination.",
+        "dlg_env_title": "Missing engines",
+        "dlg_env_desc": "These engines are missing: {engines}\n\nSee Troubleshooting.",
+        "av_alert_title": "Engine removed while running",
+        "av_alert_msg": (
+            "The file {engine} vanished while ZarManager was using it. "
+            "This is almost always antivirus deleting it as a false positive.\n\n"
+            "Your original files were not touched."
+        ),
+        "warn_exit_title": "Work in progress",
+        "warn_exit_msg": "Leaving now cancels what is running. Originals stay intact.",
+        "btn_exit_yes": "Quit and cancel",
+        "btn_exit_no": "Keep working",
+        "warn_same_dir": "Source and destination are the same folder.",
+        "warn_target_inside_source": "The destination is inside the source. It works, but results will show up in the input list.",
+        "msg_err_target": "Set the destination folder.",
+        "msg_err_select": "Select at least one item.",
+        "msg_err_running": "A job is already running.",
+
+        "upd_title": "Update",
+        "upd_checking": "Checking for updates…",
+        "upd_available": "Version {version} is available",
+        "upd_latest": "You're on the latest version ({version})",
+        "upd_error": "Could not reach the server",
+        "upd_downloading": "Downloading…",
+        "upd_installed": "Installed version: {version}",
+        "upd_no_asset": "No binary for your system in this release.",
+        "upd_checksum_failed": "The downloaded file does not match the published checksum. Update aborted.",
+        "upd_restart": "Download complete. Restarting…",
+        "btn_download_update": "Update now",
+        "btn_later": "Later",
+        "btn_close": "Close",
+    },
 }
 
-def get_text(lang: str, key: str) -> str:
-    if lang not in TRANSLATIONS:
-        lang = "pt-br"
-    return TRANSLATIONS[lang].get(key, key)
+DEFAULT_LANGUAGE = "pt-br"
+LANGUAGES = {"pt-br": "Português (Brasil)", "en": "English"}
+
+
+def get_text(lang: str, key: str, fallback: str = "", **args) -> str:
+    table = TRANSLATIONS.get(lang) or TRANSLATIONS[DEFAULT_LANGUAGE]
+    text = table.get(key) or TRANSLATIONS[DEFAULT_LANGUAGE].get(key) or fallback or key
+    if args:
+        try:
+            return text.format(**args)
+        except (KeyError, IndexError, ValueError):
+            return text
+    return text
+
+
+def missing_keys() -> dict[str, list[str]]:
+    """Chaves presentes no pt-br e ausentes noutro idioma (usado no teste)."""
+    reference = set(TRANSLATIONS[DEFAULT_LANGUAGE])
+    return {
+        lang: sorted(reference - set(table))
+        for lang, table in TRANSLATIONS.items()
+        if lang != DEFAULT_LANGUAGE
+    }

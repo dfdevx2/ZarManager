@@ -1,5 +1,22 @@
 __pycache__/
+*.py[cod]
 build/
 dist/
+AppDir/
 venv/
+.venv/
 .env/
+release_assets/
+
+# Definições do utilizador: passaram a viver na pasta de configuração do
+# sistema. O ficheiro que estava versionado continha caminhos pessoais.
+settings.json
+
+# Área de trabalho do pipeline e registos
+.zarmanager-work/
+*.log
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
