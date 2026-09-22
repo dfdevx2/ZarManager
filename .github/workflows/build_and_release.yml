@@ -270,17 +270,22 @@ jobs:
             --output-dir=dist \
             app.py
 
-          cp -R bin dist/app.app/Contents/MacOS/bin
+          # O PkgTool.Core-mac (binário AOT do dotnet) reprova sempre a
+          # validação estrita do codesign, sozinho, mesmo assinado
+          # individualmente -- não é questão de ordem nem do --deep. Fica de
+          # fora do bundle do Mac por agora; os outros motores (7z, zarchive,
+          # chdman, dolphin-tool, extract-xiso) assinam sem problema. Suporte
+          # a PKG (PS3/PS4) no Mac fica para uma correção futura (ex.: mover
+          # bin/ para Contents/Resources em vez de Contents/MacOS).
+          mkdir -p dist/app.app/Contents/MacOS/bin
+          for f in bin/*; do
+            name=$(basename "$f")
+            if [ "$name" = "PkgTool.Core-mac" ]; then
+              continue
+            fi
+            cp -R "$f" dist/app.app/Contents/MacOS/bin/
+          done
           chmod +x dist/app.app/Contents/MacOS/bin/* 2>/dev/null || true
-
-          # codesign --deep valida estritamente CADA executável nativo dentro
-          # do bundle, incluindo os que acabámos de copiar para bin/. O
-          # PkgTool.Core-mac (binário AOT do dotnet) reprova essa validação
-          # quando é assinado apenas como parte da passagem --deep do bundle
-          # inteiro. Assinando-o primeiro, individualmente, com a sua própria
-          # assinatura ad-hoc, o --deep do bundle deixa de o re-validar do
-          # zero e apenas confirma a assinatura já existente.
-          find dist/app.app/Contents/MacOS/bin -type f -perm +111 -exec codesign --force -s - {} \;
 
           codesign --force --deep -s - dist/app.app
 
